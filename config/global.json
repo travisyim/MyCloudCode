@@ -1,0 +1,11 @@
+{
+    "applications": {
+        "Mountaineers": {
+            "applicationId": "e7ZGAC2QO1dEhFQKm8C8hIiAoCb8tJaEsUwyZAiy", 
+            "masterKey": "yC4bl4FfmRk5EH1AdrjhioM8Z2jgn8V9owyl8rqr"
+        }, 
+        "_default": {
+            "link": "Mountaineers"
+        }
+    }
+}
