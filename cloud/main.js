@@ -7,7 +7,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     var xmlreader = require("cloud/xmlreader.js");
 
     // Make connection to 'Activity' class
-    var ActivityClass = Parse.Object.extend("Activity");
+    var ActivityClass = Parse.Object.extend("ActivityAll");
     var activityObj;
 
     var counter = 0;  // Initialize activity county (blocks of 50 activities)
@@ -34,17 +34,28 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         // Send request to get the first activity webpage
         return Parse.Cloud.httpRequest({
             // URL below points to all activities (not just the ones open for registration) and starts at the item 1
+            // All activities in the future
+//            url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=" +
+//                    counter * 50 + "&c16=1"
+            // All activities in past, present and future
             url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=" +
-                    counter * 50 + "&c16=1"
+                    counter * 50 + "&c6:list=1970-01-01&c6:list=9999-12-31"
+            // Test range
+//            url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=" +
+//                    counter * 50 + "&c6:list=2014-03-02&c6:list=9999-12-31"
         }).then(function(httpResponse) {
             // Use xmlreader to parse HTML code for the first entry and put into the 'Activity' class
             xmlreader.read(httpResponse.text, function (err, doc) {
                 var name;
+                var regDate;
                 var activityUrl;
                 var availabilityParticipant;
                 var availabilityLeader;
                 var desc;
                 var difficulty;
+                var activityDate;
+                var startDate;
+                var endDate;
                 var leader;
                 var keywords = [];
                 var newPromise;
@@ -60,6 +71,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
                         // Clear the name and leader fields (these have to be cleared)
                         name = null;
+                        regDate = null;
                         leader = null;
                         keywords.length = 0;
 
@@ -79,7 +91,22 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                             activityObj.set("imgUrl", doc.HTML.BODY.DIV.at(i).A.at(0).IMG.at(0).attributes().SRC);
 
                             // Registration information: /html/body/div[i]/div[1]/div[1]/div
-                            activityObj.set("regInfo", doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).DIV.at(0).text());
+                            regDate = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).DIV.at(0).text().replace("\n", "").trim();
+
+                            // Check to make sure activity has not been canceled
+                            if (regDate.toLowerCase() != "canceled") {
+                                regDate = regDate.substring(regDate.indexOf(" ", regDate.length - 7) + 1);
+
+                                // Check to see if this is an opening or closing registration date
+                                if (regDate.indexOf("open") !== -1) {  // Opening
+                                    activityObj.set("registrationStartDate", new Date(regDate));
+                                } else {  // Closing
+                                    activityObj.set("registrationEndDate", new Date(regDate));
+                                }
+                            }
+                            else {  // Activity has been canceled
+                                activityObj.set("isCanceled", true);
+                            }
 
                             // Branch: /html/body/div[i]/div[1]/div[2]
                             activityObj.set("branch", doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(1).text());
@@ -103,8 +130,8 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                             /* Availability - Leader: /html/body/div[i]/div[1]/div[1]/span[2]/strong
                              * The leader availability may not apply and therefore not exist, but due to the code in
                              * sax.js, no error is produced.  Instead, the value at the root SPAN is taken, which
-                             * corresponds to the availabilty for participants.  This is not correct, so we first need to
-                             * check if the value returned applies to "participant" or "leader". */
+                             * corresponds to the availability for participants.  This is not correct, so we first need
+                             * to check if the value returned applies to "participant" or "leader". */
                             // Get the description text that comes after the expected leader availability
                             desc = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).SPAN.at(1).text();
 
@@ -131,7 +158,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                 activityObj.set("difficulty", difficulty);
 
                                 // Activity date(s): /html/body/div[i]/div[2]/div[3]
-                                activityObj.set("activityDate", doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(2).text());
+                                activityDate = doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(2).text();
 
                                 // Prerequisites: /html/body/div[i]/div[2]/div[4]
                                 activityObj.set("prereq", doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(3).text());
@@ -142,11 +169,25 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                 activityObj.set("difficulty", "");
 
                                 // Activity date(s): /html/body/div[i]/div[2]/div[2]
-                                activityObj.set("activityDate", difficulty);  // Use the expected Difficulty value
+                                activityDate = difficulty;  // Use the expected Difficulty value
 
                                 // Prerequisites: /html/body/div[i]/div[2]/div[3]
                                 activityObj.set("prereq", doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(2).text());
                             }
+
+                            // Extract the dates from the Activity Date String
+                            if (activityDate.indexOf("-") > 0) {  // Represents actual date range
+                                startDate = activityDate.substring(0, activityDate.indexOf("-") - 1).trim();
+                                endDate = activityDate.substring(activityDate.indexOf("-") + 1).trim();
+                            }
+                            else {  // Single day activity
+                                startDate = activityDate;
+                                endDate = activityDate;
+                            }
+
+                            // Activity start and end dates
+                            activityObj.set("activityStartDate", new Date(startDate));
+                            activityObj.set("activityEndDate", new Date(endDate));
 
 //                            /* Leader: /html/body/div[i]/div[1]/div[3]/a
 //                             * The webpage often withholds the leader information so don't expect it */
@@ -185,12 +226,13 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                             // GPS Coordinates
                             newPromise = Parse.Promise.as();
                             newPromise = newPromise.then(function() {
-                                return scrapeGPSCoord(activityUrl);
+                                return scrapeGPSCoord(activityUrl, name);
                             }).then(function() {
-                                activityObj.set("startLat", Number(GPSCoord[0]));
-                                activityObj.set("startLong", Number(GPSCoord[1]));
-                                activityObj.set("endLat", Number(GPSCoord[2]));
-                                activityObj.set("endLong", Number(GPSCoord[3]));
+                                // Assign successful GPS Coords to activity object
+                                activityObj.set("startLat", GPSCoord[0] === "" ? undefined : Number(GPSCoord[0]));
+                                activityObj.set("startLong", GPSCoord[1] === "" ? undefined : Number(GPSCoord[1]));
+                                activityObj.set("endLat", GPSCoord[2] === "" ? undefined : Number(GPSCoord[2]));
+                                activityObj.set("endLong", GPSCoord[3] === "" ? undefined : Number(GPSCoord[3]));
 
                                 // Save activity object
                                 activityObj.save(null, {
@@ -203,6 +245,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                         else {
                                             // Check for more pages
                                             if (!issue) {
+                                                console.log("GPS Success in counter: " + counter);
                                                 counter++;
                                                 return scrapeActivityList();
                                             }
@@ -210,15 +253,40 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                     },
                                     error: function (activityObj, error) {  // Error saving activity to Parse class
                                         console.error("Failed to create new object, with error code: " + error.message);
-                                        return Parse.Promise.error("Failed to create new object, with error code: " +
-                                                error.message);
                                         issue = true;
+                                        return Parse.Promise.error("Failed to create new object, with error code: " +
+                                            error.message);
+                                    }
+                                });
+                            }, function (error) {
+                                // Save activity object
+                                activityObj.save(null, {
+                                    success: function (activityObj) {
+                                        // Move on to the next activity on this page
+                                        if (i < 49) {
+                                            completionHandler();
+                                        }
+                                        // Save represents the 50th activity on this page - move on to the next page
+                                        else {
+                                            // Check for more pages
+                                            if (!issue) {
+                                                console.log("GPS Error in counter: " + counter);
+                                                counter++;
+                                                return scrapeActivityList();
+                                            }
+                                        }
+                                    },
+                                    error: function (activityObj, error) {  // Error saving activity to Parse class
+                                        console.error("Failed to create new object, with error code: " + error.message);
+                                        issue = true;
+                                        return Parse.Promise.error("Failed to create new object, with error code: " +
+                                            error.message);
                                     }
                                 });
                             });
                         }
                     }
-                }
+                };
 
                 completionHandler();
             });
@@ -234,13 +302,13 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
      * Data is presented in the following format:
      * <span class="latitude">46.8528857</span>
      * <span class="longitude">-121.7603744</span> */
-    function scrapeGPSCoord(activityUrl) {
+    function scrapeGPSCoord(activityUrl, name) {
         var html;
         var reStart = /<span class="l/;  // Represents lines with either latitude or longitude
         var reEnd = /<\/span>/;  // Represents end of GPS data
         var reCoord = /(-|\d)/;  // Represents the start of GPS data (i.e. either a "-" or a number)
-        var startPosition = 0;
-        var endPosition = 0;
+        var startPosition = null;
+        var endPosition = null;
 
         GPSCoord.length = 0;  // Clear GPS coord array
 
@@ -261,9 +329,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                 GPSCoord.push(html.substr(0, endPosition));  // Add data to GPS coordinate array
             }
         }, function (error) {
-            issue = true;
-            console.error("Request failed with response code " + error.message);
-            return Parse.Promise.error("Request failed with response code " + error.message);
+            console.error("Error getting webpage for \"" + name + "\": " + activityUrl);
         });
     }
 
@@ -277,11 +343,13 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         };
 
         var keywords = field;
-        var ignoreWords = ["the", "in", "and", "to", "from", "a", "an"]  // Words to ignore
+        var ignoreWords = ["the", "in", "and", "to", "from", "a", "an", "s"];  // Words to ignore
 
         // If this is the activity name field then drop the activity type that's always printed at the beginning
         if (isActivityName) {
-            keywords = keywords.substr(keywords.indexOf("-") + 1);
+            // Special condition would be for cross-country ski trips
+            keywords = keywords.replace(/^cross-country/gi, "");  // Remove the initial chunk that has the hyphen
+            keywords = keywords.substr(keywords.indexOf("-") + 1);  // Only keep the actual activity name
         }
 
         keywords = keywords.split(/\b/);  // Split word by borders
@@ -295,5 +363,5 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         keywords = _.uniq(keywords);  // Do not allow duplicate keywords
 
         return keywords;
-    };
+    }
 });
