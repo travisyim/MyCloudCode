@@ -7,9 +7,18 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     var xmlreader = require("cloud/xmlreader.js");
 
     // Make connection to 'Activity' class
-    var ActivityClass = Parse.Object.extend("ActivityNew");
+    var ActivityClass = Parse.Object.extend("ActivityAll");
     var promises = [];  // This variable will hold all of the webpage scraping activity promises
     var orphanedActivities = 0;  // This will keep track of how many activities have lost their way (i.e. webpage)
+
+    // Define listener to handle completion event
+    var onCompletionListener = new Parse.Promise();  // Create a trivial resolved promise as a base case
+    onCompletionListener.then(function(result) {  // Overall job was successful
+        status.success("Activities successfully updated!  " + orphanedActivities
+            + " activities have been orphaned (i.e. no longer have working web pages).");
+    }, function(error) {  // Overall job failed
+        status.error(error.toString());
+    });
 
     /* This function scrapes each individual activity webpage for its GPS coordinates
      * Data is presented in the following format:
@@ -81,7 +90,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         return keywords;  // Return array of unique qualified keywords
     }
 
-    // This function scrapes each activity webpage
+    // This function scrapes each activity webpage and extracts its activities
     function scrapeActivityList(pageNumber) {
         /* This promise is monitored by overallScrapePromise and is added to the promises array.  There is an
          * activityListScrapePromise promise for each of the webpages to be scraped. */
@@ -94,26 +103,12 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 //                    (pageNumber - 1) * 50
             // All activities in past, present and future
             url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=" +
-                (pageNumber - 1) * 50 + "&c6:list=1970-01-01&c6:list=9999-12-31"
+                    (pageNumber - 1) * 50 + "&c6:list=1970-01-01&c6:list=9999-12-31"
             // Test range
 //            url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=" +
 //                    (pageNumber - 1) * 50 + "&c6:list=2014-03-02&c6:list=9999-12-31"
         }).then(function(httpResponse) {
             var html = httpResponse.text;
-
-            // Check to see if this is the first call.  If so, figure out how many webpages need to be scraped.
-            if (pageNumber === 1) {
-
-                // Extract number of webpages that need to be scraped
-                var endPosition = html.lastIndexOf("</a>");
-                var startPosition = html.lastIndexOf(">", endPosition);
-                var totalPages = parseInt(html.substring(startPosition + 1, endPosition));
-
-                // Kick-off tasks to scrape all other activity webpages
-                for (i = 2; i <= totalPages; i++) {
-                    promises.push(scrapeActivityList(i));
-                }
-            }
 
             // Use xmlreader to parse HTML code for the first entry and put into the 'Activity' class
             xmlreader.read(html, function (err, doc) {
@@ -383,18 +378,46 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         return activityListScrapePromise;  // Return promise so it can be added to the promises array
     }
 
-    // Kick-off process by requesting scraping of first page and add the promise to the array
-    var overallScrapePromise = Parse.Promise.as();  // Create a trivial resolved promise as a base case
-    overallScrapePromise = overallScrapePromise.then(function() {
-        promises.push(scrapeActivityList(1));  // Kick the process off by starting with the first page
+
+    /* The code below is what drives this Cloud Background Job.  The order of events is as follows:
+     * 1. Download the first page of results for future events
+     * 2. Extract from the webpage response the total number of webpages that make up the entirety of the activities list
+     * 3. Add all pages to be scraped into a grouped promise and run scraping tasks for all pages
+     * 4. Once all promises have been completed, begin the filter options scraping
+     * n. ...
+     * n. Send resolve or reject notification to completion handler to report final status and exit
+     */
+
+    // Request the first page of results
+    Parse.Cloud.httpRequest({
+        // All activities in the future
+//            url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=0"
+        // All activities in past, present and future
+        url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=0" +
+                "&c6:list=1970-01-01&c6:list=9999-12-31"
+        // Test range
+//            url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=0" +
+//                    "&c6:list=2014-03-02&c6:list=9999-12-31"
+    }).then(function(httpResponse) {
+        var html = httpResponse.text;
+
+        // Figure out how many webpages need to be scraped
+        // Extract number of webpages that need to be scraped
+        var endPosition = html.lastIndexOf("</a>");
+        var startPosition = html.lastIndexOf(">", endPosition);
+        var totalPages = parseInt(html.substring(startPosition + 1, endPosition));
+
+        // Kick-off tasks to scrape all other activity webpages
+        for (i = 1; i <= totalPages; i++) {
+            promises.push(scrapeActivityList(i));
+        }
 
         return Parse.Promise.when(promises);  // Wait until all promises return resolved (or there is a rejection)
-    }).then(function(result) {  // Overall job was successful
-        console.log(result);
-
-        status.success("Activities successfully updated!  " + orphanedActivities
-                    + " activities have been orphaned (i.e. no longer have working web pages).");
-    }, function(error) {  // Overall job failed
-        status.error(error.toString());
+    }, function (error) {  // Could not retrieve initial website
+        onCompletionListener.reject("Initial web page request failed with response code " + error.message);
+    }).then(function() {
+        onCompletionListener.resolve();  // Tell the listener all promises were resolved
+    }, function (error) {
+        onCompletionListener.reject(error);  // Send error through to listener
     });
 });
