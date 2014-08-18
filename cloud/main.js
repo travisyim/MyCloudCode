@@ -241,7 +241,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                 var keywords = [];
                 var gpsPromise;
                 var i = -1;
-                var exists = false;
 
                 // There are 50 items on each webpage (except for the last page).  All items start at 0.
                 var scrapeNextActivity = function () {
@@ -273,10 +272,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
                             // Name: /html/body/div[i]/div[2]/h3/a
                             name = doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).text();
-
-                            if (name !== activityObj.get("name")) {
-                                activityObj.set("name", name);
-                            }
+                            activityObj.set("name", name);
 
                             // Type: /html/body/div[i]/div[2]/div[1]
                             activityObj.set("type", doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(0).text());
