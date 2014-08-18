@@ -11,6 +11,123 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     var promises = [];  // This variable will hold all of the webpage scraping activity promises
     var orphanedActivities = 0;  // This will keep track of how many activities have lost their way (i.e. webpage)
 
+    // Filter category variables
+    var filterCriteria = [
+        "isAdventureClub",
+        "isAvalancheSafety",
+        "isBackpacking",
+        "isClimbing",
+        "isDayHiking",
+        "isExplorers",
+        "isExploringNature",
+        "isFirstAid",
+        "isGlobalAdventures",
+        "isMountainWorkshop",
+        "isNavigation",
+        "isOutdoorLeadership",
+        "isPhotography",
+        "isSailing",
+        "isScrambling",
+        "isSeaKayaking",
+        "isSkiingSnowboarding",
+        "isSnowshoeing",
+        "isStandUpPaddling",
+        "isStewardship",
+        "isTrailRunning",
+        "isUrbanAdventure",
+        "isYouthType",
+        "isForBeginners",
+        "isEasy",
+        "isModerate",
+        "isChallenging",
+        "isAdults",
+        "isFamilies",
+        "isRetiredRovers",
+        "isSingles",
+        "is2030Somethings",
+        "isYouth",
+        "isTheMountaineers",
+        "isBellingham",
+        "isEverett",
+        "isFoothills",
+        "isKitsap",
+        "isOlympia",
+        "isOutdoorCenters",
+        "isSeattle",
+        "isTacoma",
+        "isBasicAlpine",
+        "isIntermediateAlpine",
+        "isBoulder",
+        "isAidClimb",
+        "isRockClimb",
+        "isWaterIce",
+        "isCrosscountry",
+        "isBackcountry",
+        "isGlacier",
+        "isBeginner",
+        "isBasic",
+        "isIntermediate"
+    ];
+
+    var filterBaseUrl = [
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Adventure+Club&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Avalanche+Safety&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Backpacking&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Climbing&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Day+Hiking&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Explorers&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Exploring+Nature&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=First+Aid&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Global+Adventures&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Mountain+Workshop&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Navigation&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Outdoor+Leadership&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Photography&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Sailing&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Scrambling&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Sea+Kayaking&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Skiing/Snowboarding&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Snowshoeing&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Stand+Up+Paddling&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Stewardship&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Trail+Running&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Urban+Adventure&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Youth&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c15=For+Beginners+(Getting+Started+Series)&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c15=Easy&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c15=Moderate&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c15=Challenging&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c5=Adults&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c5=Families&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c5=Retired+Rovers&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c5=Singles&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c5=20-30+Somethings&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c5=Youth&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=The+Mountaineers&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Bellingham&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Everett&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Foothills&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Kitsap&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Olympia&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Outdoor+Centers&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Seattle&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Tacoma&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c7=Basic+Alpine&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c7=Intermediate+Alpine&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c7=Boulder&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c7=Aid+Climb&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c7=Rock+Climb&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c7=Water+Ice&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c9=Cross-country&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c9=Backcountry&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c9=Glacier&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c10=Beginner&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c10=Basic&b_start=",
+        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c10=Intermediate&b_start="
+    ];
+
+    var filterTotalPages = new Array(filterCriteria.length);
+
     // Define listener to handle completion event
     var onCompletionListener = new Parse.Promise();  // Create a trivial resolved promise as a base case
     onCompletionListener.then(function(result) {  // Overall job was successful
@@ -52,8 +169,8 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
             // Return GPS coordinates
             return Parse.Promise.as(GPSCoord);
-        }, function (httpResponse) {
-            // Return Parse error if error is encountered along with the error message
+        }, function(httpResponse) {
+            // Return Parse error if error is encountered
             return Parse.Promise.error(httpResponse.status);
         });
     }
@@ -90,6 +207,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         return keywords;  // Return array of unique qualified keywords
     }
 
+    // TODO: Add a check if there is one activity on the last page to see if it matches the last entry on the previous page.  If so, do not add duplicate!
     // This function scrapes each activity webpage and extracts its activities
     function scrapeActivityList(pageNumber) {
         /* This promise is monitored by overallScrapePromise and is added to the promises array.  There is an
@@ -104,9 +222,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             // All activities in past, present and future
             url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=" +
                     (pageNumber - 1) * 50 + "&c6:list=1970-01-01&c6:list=9999-12-31"
-            // Test range
-//            url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=" +
-//                    (pageNumber - 1) * 50 + "&c6:list=2014-03-02&c6:list=9999-12-31"
         }).then(function(httpResponse) {
             var html = httpResponse.text;
 
@@ -126,16 +241,18 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                 var keywords = [];
                 var gpsPromise;
                 var i = -1;
+                var exists = false;
 
                 // There are 50 items on each webpage (except for the last page).  All items start at 0.
                 var scrapeNextActivity = function () {
+                    // TODO: Convert this if loop to a for loop
                     i++;
 
                     if (i < 50) {
                         // Represents the activity that will be saved/updated to/in the backend
                         var activityObj = new ActivityClass();
 
-                        // Clear the name and leader fields (these have to be cleared)
+                        // Clear the fields so that the information is not used incorrectly for the next activity
                         name = null;
                         activityUrl = null;
                         regDate = null;
@@ -150,13 +267,16 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                         keywords.length = 0;
 
                         try {
-                            // Name: /html/body/div[i]/div[2]/h3/a
-                            name = doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).text();
-                            activityObj.set("name", name);
-
                             // Webpage Address: HREF at /html/body/div[i]/div[2]/h3/a
                             activityUrl = doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).attributes().HREF;
                             activityObj.set("activityUrl", activityUrl);
+
+                            // Name: /html/body/div[i]/div[2]/h3/a
+                            name = doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).text();
+
+                            if (name !== activityObj.get("name")) {
+                                activityObj.set("name", name);
+                            }
 
                             // Type: /html/body/div[i]/div[2]/div[1]
                             activityObj.set("type", doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(0).text());
@@ -336,7 +456,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                                     + error.code + ": " + error.message);
                                     }
                                 });
-                            }, function (error) {
+                            }, function(error) {
                                 /* If the activity had been removed but still points to a non-existent link, we'll get
                                  * an error.  This information is still saved.  This is an error on the activity
                                  * level and not an overall process error so just continue scraping activities. */
@@ -345,7 +465,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
                                 // Save activity object
                                 activityObj.save(null, {
-                                    success: function (activityObjSave) {
+                                    success: function(activityObjSave) {
                                         // Move on to the next activity on this page
                                         if (i < 49) {
                                             scrapeNextActivity();
@@ -356,7 +476,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                             activityListScrapePromise.resolve("Page " + pageNumber + " complete!");
                                         }
                                     },
-                                    error: function (activityObjSave, error) {  // Error saving activity to Parse class
+                                    error: function(activityObjSave, error) {  // Error saving activity to Parse class
                                         // Reject this promise and send error
                                         activityListScrapePromise.reject("Failed to create new object.  Error code "
                                                     + error.code + ": " + error.message);
@@ -369,13 +489,172 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
                 scrapeNextActivity();  // This starts off the scraping activity task (i.e. scrapeNextActivity function)
             });
-        /* Error handler if webpage does not exist.  This technically should never be encountered because there is
-         * always a webpage generated no matter the search starting ID number */
-        }, function (error) {
+        // Error handler if webpage does not exist
+        }, function(error) {
             activityListScrapePromise.reject("Web page request failed with response code " + error.message);
         });
 
         return activityListScrapePromise;  // Return promise so it can be added to the promises array
+    }
+
+    // This function retrieves the total number of pages in a given search (used by filters)
+    function getTotalPages(criteria, baseURL, position) {
+        // Request the first page of results to determine total number of pages (based on links at bottom of page)
+        return Parse.Cloud.httpRequest({
+            // All activities in the future
+//            url: baseURL + "0"
+            // All activities in past, present and future
+            url: baseURL + "0" + "&c6:list=1970-01-01&c6:list=9999-12-31"
+        }).then(function (httpResponse) {
+            var html = httpResponse.text;
+
+            // Figure out how many webpages need to be scraped
+            // Extract number of webpages that need to be scraped and assign to array
+            var endPosition = html.lastIndexOf("</a>");
+            var startPosition = html.lastIndexOf(">", endPosition);
+            var totalPages = parseInt(html.substring(startPosition + 1, endPosition));
+
+            // Check to see if there was an error getting the total pages
+            if (isNaN(totalPages)) {  // If there is only one page, totalPages is a null number (a.k.a. Not a Number)
+                totalPages = 1;
+            }
+
+            filterTotalPages[position] = totalPages;
+
+            return Parse.Promise.as("Completed determining the total number of web pages for " + criteria + "!");
+        }, function (httpResponse) {  // Could not retrieve initial website
+            // Return Parse error if error is encountered
+            return Parse.Promise.error("Error code: " + httpResponse.status
+                        + ".  Could not retrieve initial web page for " + criteria + ": " + baseURL + "0");
+        });
+
+        return getTotalPagesPromise;
+    }
+
+    // This function sets the filter criteria for all activities
+    function filterAssignment(criteria, baseURL, pageNumber) {
+        /* This promise is monitored by overallScrapePromise and is added to the promises array.  There is an
+         * filterAssignmentPromise promise for each of the webpages to be scraped. */
+        var filterAssignmentPromise = new Parse.Promise();
+
+        // Send request to get the activity webpage
+        Parse.Cloud.httpRequest({
+            // All activities in the future
+//            url: baseURL + (pageNumber - 1) * 50
+            // All activities in past, present and future
+            url: baseURL + (pageNumber - 1) * 50 + "&c6:list=1970-01-01&c6:list=9999-12-31"
+        }).then(function(httpResponse) {
+            var html = httpResponse.text;
+            var activityURLs = [];  // This variable will hold all activity URLs that satisfy this filter
+            var query;
+
+            // Use xmlreader to parse HTML code for all entries and put activity URL into array
+            xmlreader.read(html, function (err, doc) {
+                // There are 50 items on each webpage (except for the last page).  All items start at 0.
+                for (var i = 0; i < 50; i++) {
+                    try {
+                        // Webpage Address: HREF at /html/body/div[i]/div[2]/h3/a
+                        activityURLs.push(doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).attributes().HREF);
+                    }
+                    catch (err) {
+                        /* Reached the end of activities for this page.  There are less than 50 activities on
+                         * this page (should only occur for last page) */
+                        //console.log("End of " + criteria + " data @ " + ((pageNumber - 1) * 50 + i + 1));
+                        break;
+                    }
+                }
+            });
+
+            /* Update any activities that showed up on this filtered activity list and set its filter criteria value to
+             * true (if it was set to false or undefined previously */
+
+              // Get list of Parse objects that correspond to the activity URLs
+            query = new Parse.Query(ActivityClass);  // Create new query
+            // ... where the object corresponds to one of the filtered activity URLs
+            query.containedIn("activityUrl", activityURLs);
+
+            // ... where the activity start date occurs sometime in the future (includes current day)
+            /* Note that the time below is adjusting a day back since an activity date is saved at the beginning of
+             * its day (i.e. at midnight).  The time is further adjusted to account for the Parse server being set
+             * at UTC, while all activities are in PST (-7). */
+            //query.greaterThan("activityStartDate", new Date(new Date().getTime() - ((24 + 7) * 60 * 60 * 1000)));
+
+            // ... where the filter criteria value is currently not true (i.e. false or undefined)
+            query.notEqualTo(criteria, true);
+            /* ... give us only this filter criteria field of interest (do not send other fields to minimize resource
+             * usage) */
+            query.select(criteria);
+            query.limit(1000);  // Set query results to the max of 1000
+
+            // Launch query and retrieve objects matching the specified query
+            query.find().then(function (results) {
+                // If any activities are returned matching our criteria then update and save
+                if (results.length !== 0) {
+                    for (var i = 0; i < results.length; i++) {
+                        results[i].set(criteria, true);  // Set this filter criteria value to true
+                    }
+
+                    console.log(criteria + " was set true for " + results.length + " activities.");
+                    return Parse.Object.saveAll(results);  // Save all results
+                }
+                else {  // No activities found so no updates needed
+                    return Parse.Promise.as("No updates needed");  // Return resolved promise to move onto next step
+                }
+//            }).then(function (results) {
+//                /* Update any activities that did not show up on this filtered activity list to set its filter criteria
+//                 * value to false (if it was set to true previously) */
+//
+//                 // Get list of Parse objects that do not correspond to the activity URLs
+//                query = new Parse.Query(ActivityClass);  // Create new query
+//                // ... where the object does not correspond to one of the filtered activity URLs
+//                query.notContainedIn("activityUrl", activityURLs);
+//
+//                // ... where the activity start date occurs sometime in the future (includes current day)
+//                /* Note that the time below is adjusting a day back since an activity date is saved at the beginning of
+//                 * its day (i.e. at midnight).  The time is further adjusted to account for the Parse server being set
+//                 * at UTC, while all activities are in PST (-7). */
+//                //query.greaterThan("activityStartDate", new Date(new Date().getTime() - ((24 + 7) * 60 * 60 * 1000)));
+//
+//                // ... where the activity was updated more than 5 minutes ago
+//                /* Only activities last updated more than 2 minutes ago should be updated.  This would prevent us from
+//                 * changing the activities that were just changed to true in the promise above. */
+//                query.lessThan("updatedAt", new Date(new Date().getTime() - (2 * 60 * 1000)));
+//
+//                // ... where the filter criteria value is currently true
+//                query.equalTo(criteria, true);
+//                /* ... give us only this filter criteria field of interest (do not send other fields to minimize resource
+//                 * usage) */
+//                query.select(criteria);
+//                query.limit(1000);  // Set query results to the max of 1000
+//
+//                // Launch query and retrieve objects matching the specified query
+//                return query.find();
+//            }).then(function (results) {
+//                // If any activities are returned matching our criteria then update and save
+//                if (results.length !== 0) {
+//                    for (var i = 0; i < results.length; i++) {
+//                        results[i].set(criteria, false);  // Set this filter criteria value to false
+//                    }
+//
+//                    console.log(criteria + " was set false for " + results.length + " activities.");
+//                    return Parse.Object.saveAll(results);  // Save all results
+//                }
+//                else {  // No activities found so no updates needed
+//                    return Parse.Promise.as("No updates needed");  // Return resolved promise to move onto next step
+//                }
+            }).then(function (results) {
+                filterAssignmentPromise.resolve(criteria + " has been updated!");
+            }, function (error) {
+                filterAssignmentPromise.reject("Could not update " + criteria + ".  " + error.message);
+            });
+
+            // Error handler if webpage does not exist
+        }, function(error) {
+            filterAssignmentPromise.reject("Could not retrieve " + criteria + " web page #" + pageNumber +
+                        ".  Error code: " + httpResponse.status);
+        });
+
+        return filterAssignmentPromise;  // Return promise so it can be added to the promises array
     }
 
 
@@ -388,16 +667,13 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
      * n. Send resolve or reject notification to completion handler to report final status and exit
      */
 
-    // Request the first page of results
+    // Request the first page of results to determine total number of pages (based on links at bottom of page)
     Parse.Cloud.httpRequest({
         // All activities in the future
 //            url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=0"
         // All activities in past, present and future
         url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=0" +
                 "&c6:list=1970-01-01&c6:list=9999-12-31"
-        // Test range
-//            url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=0" +
-//                    "&c6:list=2014-03-02&c6:list=9999-12-31"
     }).then(function(httpResponse) {
         var html = httpResponse.text;
 
@@ -407,14 +683,39 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         var startPosition = html.lastIndexOf(">", endPosition);
         var totalPages = parseInt(html.substring(startPosition + 1, endPosition));
 
+        // Check to see if there was an error getting the total pages
+        if (isNaN(totalPages)) {  // If there is only one page, totalPages is a null number (a.k.a. Not a Number)
+            totalPages = 1;
+        }
+
         // Kick-off tasks to scrape all other activity webpages
-        for (i = 1; i <= totalPages; i++) {
+        for (var i = 1; i <= totalPages; i++) {
             promises.push(scrapeActivityList(i));
         }
 
         return Parse.Promise.when(promises);  // Wait until all promises return resolved (or there is a rejection)
     }, function (error) {  // Could not retrieve initial website
-        onCompletionListener.reject("Initial web page request failed with response code " + error.message);
+        return Parse.Promise.error("Initial web page request failed with response code " + error.message);
+    }).then(function() {
+        promises.length = 0;  // Clear the promises array
+
+        // Get the total pages for each category
+        for (var i = 0; i < filterCriteria.length; i++) {
+            promises.push(getTotalPages(filterCriteria[i], filterBaseUrl[i], i));
+        }
+
+        return Parse.Promise.when(promises);  // Wait until all promises return resolved (or there is a rejection)
+    }).then(function() {
+        promises.length = 0;  // Clear the promises array
+
+        // Start the filter assignment task for each category (iterate over the total number of pages
+        for (var i = 0; i < filterCriteria.length; i++) {
+            for (var j = 1; j <= filterTotalPages[i]; j++) {
+                promises.push(filterAssignment(filterCriteria[i], filterBaseUrl[i], j));
+            }
+        }
+
+        return Parse.Promise.when(promises);  // Wait until all promises return resolved (or there is a rejection)
     }).then(function() {
         onCompletionListener.resolve();  // Tell the listener all promises were resolved
     }, function (error) {
