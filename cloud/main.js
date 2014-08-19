@@ -229,6 +229,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             xmlreader.read(html, function (err, doc) {
                 var name;
                 var activityUrl;
+                var regInfo;
                 var regDate;
                 var availabilityParticipant;
                 var availabilityLeader;
@@ -254,6 +255,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                         // Clear the fields so that the information is not used incorrectly for the next activity
                         name = null;
                         activityUrl = null;
+                        regInfo = null;
                         regDate = null;
                         availabilityParticipant = null;
                         availabilityLeader = null;
@@ -279,24 +281,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
                             // Picture: /html/body/div[i]/a/img
                             activityObj.set("imgUrl", doc.HTML.BODY.DIV.at(i).A.at(0).IMG.at(0).attributes().SRC);
-
-                            // Registration information: /html/body/div[i]/div[1]/div[1]/div
-                            regDate = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).DIV.at(0).text().replace("\n", "").trim();
-
-                            // Check to make sure activity has not been canceled
-                            if (regDate.toLowerCase() != "canceled") {
-                                regDate = regDate.substring(regDate.indexOf(" ", regDate.length - 7) + 1);
-
-                                // Check to see if this is an opening or closing registration date
-                                if (regDate.indexOf("open") !== -1) {  // Opening
-                                    activityObj.set("registrationStartDate", new Date(regDate));
-                                } else {  // Closing
-                                    activityObj.set("registrationEndDate", new Date(regDate));
-                                }
-                            }
-                            else {  // Activity has been canceled
-                                activityObj.set("isCanceled", true);
-                            }
 
                             // Branch: /html/body/div[i]/div[1]/div[2]
                             activityObj.set("branch", doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(1).text());
@@ -367,17 +351,49 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
                             // Extract the dates from the Activity Date String
                             if (activityDate.indexOf("-") > 0) {  // Represents actual date range
-                                startDate = activityDate.substring(0, activityDate.indexOf("-") - 1).trim();
-                                endDate = activityDate.substring(activityDate.indexOf("-") + 1).trim();
+                                startDate = new Date(activityDate.substring(0, activityDate.indexOf("-") - 1).trim());
+                                endDate = new Date(activityDate.substring(activityDate.indexOf("-") + 1).trim());
                             }
                             else {  // Single day activity
-                                startDate = activityDate;
-                                endDate = activityDate;
+                                startDate = new Date(activityDate);
+                                endDate = new Date(activityDate);
                             }
 
                             // Activity start and end dates
-                            activityObj.set("activityStartDate", new Date(startDate));
-                            activityObj.set("activityEndDate", new Date(endDate));
+                            activityObj.set("activityStartDate", startDate);
+                            activityObj.set("activityEndDate", endDate);
+
+                            // Registration information: /html/body/div[i]/div[1]/div[1]/div
+                            regInfo = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).DIV.at(0).text().replace("\n", "").trim();
+
+                            // Check to make sure activity has not been canceled
+                            if (regInfo.toLowerCase() != "canceled") {
+                                // Get the date portion of the registration info string
+                                regDate = regInfo.substring(regInfo.indexOf(" ", regInfo.length - 7) + 1);
+
+                                // Get the registration date as a Date object
+                                regDate = new Date(regDate);
+
+                                // Assign year to regDate since none is provided
+                                if (regDate.getMonth() > startDate.getMonth()) {  // Happened in the previous year
+                                    // Set as previous year relative to startDate
+                                    regDate.setFullYear(startDate.getFullYear() - 1);
+                                }
+                                else {  // Happened earlier in the year or in the same month - assume same year
+                                    regDate.setFullYear(startDate.getFullYear());  // Set as startDate's year
+                                }
+
+                                // Check to see if this is an opening or closing registration date
+                                    if (regInfo.toLowerCase().indexOf("open") !== -1) {  // Opening
+                                        activityObj.set("registrationOpenDate", regDate);
+                                    }
+                                    else {  // Closing
+                                        activityObj.set("registrationCloseDate", regDate);
+                                    }
+                            }
+                            else {  // Activity has been canceled
+                                activityObj.set("isCanceled", true);
+                            }
 
 //                            /* Leader: /html/body/div[i]/div[1]/div[3]/a
 //                             * The webpage often withholds the leader information so don't expect it */
@@ -590,7 +606,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                         results[i].set(criteria, true);  // Set this filter criteria value to true
                     }
 
-                    console.log(criteria + " was set true for " + results.length + " activities.");
                     return Parse.Object.saveAll(results);  // Save all results
                 }
                 else {  // No activities found so no updates needed
