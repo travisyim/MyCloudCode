@@ -7,7 +7,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     var xmlreader = require("cloud/xmlreader.js");
 
     // Make connection to 'Activity' class
-    var ActivityClass = Parse.Object.extend("ActivityAll");
+    var ActivityClass = Parse.Object.extend("Activity");
     var promises = [];  // This variable will hold all of the webpage scraping activity promises
     var orphanedActivities = 0;  // This will keep track of how many activities have lost their way (i.e. webpage)
 
@@ -130,7 +130,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
     // Define listener to handle completion event
     var onCompletionListener = new Parse.Promise();  // Create a trivial resolved promise as a base case
-    onCompletionListener.then(function(result) {  // Overall job was successful
+    onCompletionListener.then(function() {  // Overall job was successful
         status.success("Activities successfully updated!  " + orphanedActivities
             + " activities have been orphaned (i.e. no longer have working web pages).");
     }, function(error) {  // Overall job failed
@@ -141,14 +141,20 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
      * Data is presented in the following format:
      * <span class="latitude">46.8528857</span>
      * <span class="longitude">-121.7603744</span> */
-    function scrapeGPSCoord(activityUrl) {
+    function scrapeAdditionalInfo(activityUrl) {
         var html;
-        var GPSCoord = [];  // Array that holds GPS coordinates for each activity
-        var reStart = /<span class="l/;  // Represents lines with either latitude or longitude
-        var reEnd = /<\/span>/;  // Represents end of GPS data
-        var reCoord = /(-|\d)/;  // Represents the start of GPS data (i.e. either a "-" or a number)
+        var additionalInfo = [];  // Array that holds GPS coordinates for each activity
+        // Represents the next HTML line after the leader name
+        var leaderApproxPosition = "Primary Leader";
+        var leaderStart = "<div>";  // Represents the end of the leader name
+        var leaderEnd = "</div>";  // Represents the end of the leader name
+        var gpsStart = /<span class="l/;  // Represents lines with either latitude or longitude
+        var gpsEnd = /<\/span>/;  // Represents end of GPS data
+        var gpsCoord = /(-|\d)/;  // Represents the start of GPS data (i.e. either a "-" or a number)
         var startPosition;
         var endPosition;
+        var approxPosition;
+        var tempStr;
 
         // Send request to get the first activity webpage
         return Parse.Cloud.httpRequest({
@@ -157,18 +163,34 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         }).then(function(httpResponse) {
             html = httpResponse.text;  // Make a copy of the webpage HTML text
 
+            // Leader information
+            approxPosition = html.search(leaderApproxPosition);  // Find approximate location of the leader data
+            endPosition = html.lastIndexOf(leaderEnd, approxPosition);
+            startPosition = html.lastIndexOf(leaderStart, endPosition) + 5;
+            additionalInfo.push(html.substring(startPosition, endPosition));  // Leader name
+
+            // Qualified Youth Leader
+            tempStr = html.substr(approxPosition, 120);  // Examine the line after the "Primary Leader" designation
+            if (tempStr.search("Qualified Youth Leader") !== -1) {  // Look for Qualified Youth Leader designation
+                additionalInfo.push(true);  // Found
+            }
+            else {  // Not found
+                additionalInfo.push(false);
+            }
+
+            // GPS coordinates
             for (var i = 0; i < 4; i++) {
                 // Scrape 2 sets of latitude and longitude data
-                startPosition = html.search(reStart);  // Find start of GPS coordinate data
+                startPosition = html.search(gpsStart);  // Find start of GPS coordinate data
                 // Truncate string to the beginning of our data of interest (i.e. <span class="l)
                 html = html.substr(startPosition);
-                html = html.substr(html.search(reCoord));  // Truncate to start of numbers
-                endPosition = html.search(reEnd);  // Find position marking the end of numbers (i.e. </span>)
-                GPSCoord.push(html.substr(0, endPosition));  // Add data to GPS coordinate array
+                html = html.substr(html.search(gpsCoord));  // Truncate to start of numbers
+                endPosition = html.search(gpsEnd);  // Find position marking the end of numbers (i.e. </span>)
+                additionalInfo.push(html.substr(0, endPosition));  // Add data to GPS coordinate array
             }
 
             // Return GPS coordinates
-            return Parse.Promise.as(GPSCoord);
+            return Parse.Promise.as(additionalInfo);
         }, function(httpResponse) {
             // Return Parse error if error is encountered
             return Parse.Promise.error(httpResponse.status);
@@ -203,7 +225,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         });
 
         keywords = _.uniq(keywords);  // Do not allow duplicate keywords
-
         return keywords;  // Return array of unique qualified keywords
     }
 
@@ -239,8 +260,9 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                 var startDate;
                 var endDate;
                 var leader;
+                var isQYL;
                 var keywords = [];
-                var gpsPromise;
+                var additionalInfoPromise;
                 var i = -1;
 
                 // There are 50 items on each webpage (except for the last page).  All items start at 0.
@@ -401,7 +423,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 //                            activityObj.set("leader", leader);
 //
 //                            // Qualified Youth Leader: /html/body/div[i]/div[1]/div[3]/div/em
-//                            activityObj.set("qualYouthLeader", doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(2).DIV.at(0).EM
+//                            activityObj.set("isQYL", doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(2).DIV.at(0).EM
 //                                    .at(0).text());
                         }
                         /* This error handler catches any attempt to read an entry beyond those that exist on this page
@@ -431,23 +453,32 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                             // Get keywords from activity name field
                             keywords = getKeywords(name, true);
 
-                            // Get keywords from leader field only if there is a leader value
-                            if (leader !== null) {
-                                keywords.concat(getKeywords(leader, false));
-                            }
-
-                            activityObj.set("keywords", keywords);  // Keywords for search
-
                             // GPS Coordinates
-                            gpsPromise = Parse.Promise.as();  // Create a trivial resolved promise as a base case
-                            gpsPromise = gpsPromise.then(function() {
-                                return scrapeGPSCoord(activityUrl);
-                            }).then(function(GPSCoord) {
-                                // Assign GPS coordinates
-                                activityObj.set("startLat", GPSCoord[0] === "" ? undefined : Number(GPSCoord[0]));
-                                activityObj.set("startLong", GPSCoord[1] === "" ? undefined : Number(GPSCoord[1]));
-                                activityObj.set("endLat", GPSCoord[2] === "" ? undefined : Number(GPSCoord[2]));
-                                activityObj.set("endLong", GPSCoord[3] === "" ? undefined : Number(GPSCoord[3]));
+                            additionalInfoPromise = Parse.Promise.as();  // Create a trivial resolved promise as a base case
+                            additionalInfoPromise = additionalInfoPromise.then(function() {
+                                return scrapeAdditionalInfo(activityUrl);
+                            }).then(function(additionalInfo) {
+                                // Leader information
+                                leader = additionalInfo[0];
+                                activityObj.set("leader", leader);
+                                activityObj.set("isQYL", additionalInfo[1]);
+
+                                    // Assign GPS coordinates
+                                activityObj.set("startLat", additionalInfo[2] === "" ? undefined :
+                                            Number(additionalInfo[2]));
+                                activityObj.set("startLong", additionalInfo[3] === "" ? undefined :
+                                            Number(additionalInfo[3]));
+                                activityObj.set("endLat", additionalInfo[4] === "" ? undefined :
+                                            Number(additionalInfo[4]));
+                                activityObj.set("endLong", additionalInfo[5] === "" ? undefined :
+                                            Number(additionalInfo[5]));
+
+                                // Get keywords from leader field only if there is a leader value
+                                if (leader !== null) {
+                                    keywords = keywords.concat(getKeywords(leader, false));
+                                }
+
+                                activityObj.set("keywords", keywords);  // Keywords for search
 
                                 // Save activity object
                                 activityObj.save(null, {
@@ -474,6 +505,9 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                  * level and not an overall process error so just continue scraping activities. */
                                 console.error("Error code " + error + " for \"" + name + "\": " + activityUrl);
                                 orphanedActivities++;
+
+                                // Was waiting to include leader name in keywords but that information was not scraped
+                                activityObj.set("keywords", keywords);  // Keywords for search
 
                                 // Save activity object
                                 activityObj.save(null, {
