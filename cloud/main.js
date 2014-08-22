@@ -6,10 +6,13 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
      * xmlreader.js for HTML) */
     var xmlreader = require("cloud/xmlreader.js");
 
-    // Make connection to 'Activity' class
-    var ActivityClass = Parse.Object.extend("Activity");
+    var ActivityClass = Parse.Object.extend("ActivityAll");  // Make connection to 'Activity' class
     var promises = [];  // This variable will hold all of the webpage scraping activity promises
     var orphanedActivities = 0;  // This will keep track of how many activities have lost their way (i.e. webpage)
+
+    //var dateRange = "&c6:list=1970-01-01&c6:list=9999-12-31";  // All activities
+    var dateRange = "";  // All activities in the future (including today)
+    //var dateRange = "&c6:list=2014-06-01&c6:list=2014-08-01";  // Custom range
 
     // Filter category variables
     var filterCriteria = [
@@ -127,6 +130,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     ];
 
     var filterTotalPages = new Array(filterCriteria.length);
+    var filteredURLs = [];
 
     // Define listener to handle completion event
     var onCompletionListener = new Parse.Promise();  // Create a trivial resolved promise as a base case
@@ -237,12 +241,8 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
         // Send request to get the activity webpage
         Parse.Cloud.httpRequest({
-            // URL below points to all activities in the future
-//            url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=" +
-//                    (pageNumber - 1) * 50
-            // All activities in past, present and future
             url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=" +
-                    (pageNumber - 1) * 50 + "&c6:list=1970-01-01&c6:list=9999-12-31"
+                    (pageNumber - 1) * 50 + dateRange
         }).then(function(httpResponse) {
             var html = httpResponse.text;
 
@@ -267,7 +267,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
                 // There are 50 items on each webpage (except for the last page).  All items start at 0.
                 var scrapeNextActivity = function () {
-                    // TODO: Convert this if loop to a for loop
                     i++;
 
                     if (i < 50) {
@@ -292,6 +291,10 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                         try {
                             // Webpage Address: HREF at /html/body/div[i]/div[2]/h3/a
                             activityUrl = doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).attributes().HREF;
+
+                            // Check to see if this activity URL already exists
+
+
                             activityObj.set("activityUrl", activityUrl);
 
                             // Name: /html/body/div[i]/div[2]/h3/a
@@ -416,15 +419,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                             else {  // Activity has been canceled
                                 activityObj.set("isCanceled", true);
                             }
-
-//                            /* Leader: /html/body/div[i]/div[1]/div[3]/a
-//                             * The webpage often withholds the leader information so don't expect it */
-//                            leader = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(2).A.at(0).text();
-//                            activityObj.set("leader", leader);
-//
-//                            // Qualified Youth Leader: /html/body/div[i]/div[1]/div[3]/div/em
-//                            activityObj.set("isQYL", doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(2).DIV.at(0).EM
-//                                    .at(0).text());
                         }
                         /* This error handler catches any attempt to read an entry beyond those that exist on this page
                          * or any failed attempt at obtaining data that does not exist for the given activity */
@@ -533,11 +527,12 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                     }
                 };
 
-                scrapeNextActivity();  // This starts off the scraping activity task (i.e. scrapeNextActivity function)
+                // This starts off the scraping activity task and then calls the next one once complete
+                scrapeNextActivity();
             });
         // Error handler if webpage does not exist
-        }, function(error) {
-            activityListScrapePromise.reject("Web page request failed with response code " + error.message);
+        }, function(httpResponse) {
+            activityListScrapePromise.reject("Web page request failed with response code " + httpResponse.status);
         });
 
         return activityListScrapePromise;  // Return promise so it can be added to the promises array
@@ -547,10 +542,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     function getTotalPages(criteria, baseURL, position) {
         // Request the first page of results to determine total number of pages (based on links at bottom of page)
         return Parse.Cloud.httpRequest({
-            // All activities in the future
-//            url: baseURL + "0"
-            // All activities in past, present and future
-            url: baseURL + "0" + "&c6:list=1970-01-01&c6:list=9999-12-31"
+            url: baseURL + "0" + dateRange
         }).then(function (httpResponse) {
             var html = httpResponse.text;
 
@@ -578,125 +570,121 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     }
 
     // This function sets the filter criteria for all activities
-    function filterAssignment(criteria, baseURL, pageNumber) {
-        /* This promise is monitored by overallScrapePromise and is added to the promises array.  There is an
-         * filterAssignmentPromise promise for each of the webpages to be scraped. */
-        var filterAssignmentPromise = new Parse.Promise();
-
+    function getFilteredURLs(filterCriteriaIndex, baseURL, pageNumber) {
         // Send request to get the activity webpage
-        Parse.Cloud.httpRequest({
-            // All activities in the future
-//            url: baseURL + (pageNumber - 1) * 50
-            // All activities in past, present and future
-            url: baseURL + (pageNumber - 1) * 50 + "&c6:list=1970-01-01&c6:list=9999-12-31"
+        return Parse.Cloud.httpRequest({
+            url: baseURL + (pageNumber - 1) * 50 + dateRange
         }).then(function(httpResponse) {
             var html = httpResponse.text;
-            var activityURLs = [];  // This variable will hold all activity URLs that satisfy this filter
-            var query;
+            var url;
 
             // Use xmlreader to parse HTML code for all entries and put activity URL into array
             xmlreader.read(html, function (err, doc) {
                 // There are 50 items on each webpage (except for the last page).  All items start at 0.
                 for (var i = 0; i < 50; i++) {
                     try {
+                        /* There is a special condition where xmlreader.js and sax.js do not function correctly.  For
+                         * the case where there is one result on the webpage, the xmlreader command for i > 1 returns
+                         * the same value as i = 1.  This results in us having 50 URLs that are all the same.  Since
+                         * URLs must be unique, catch this bug by comparing the URL to the previously scraped URL and
+                         * see if it is the same. */
                         // Webpage Address: HREF at /html/body/div[i]/div[2]/h3/a
-                        activityURLs.push(doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).attributes().HREF);
+                        url = doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).attributes().HREF;
+
+                        // Check for special condition as described above
+                        if (i === 1 && url === filteredURLs[filterCriteriaIndex][0]) {
+                            return Parse.Promise.as(filterCriteria[filterCriteriaIndex] + " (Page " + pageNumber +
+                                ") URLs have been extracted!");
+                        }
+                        else {  // Not the special condition
+                            filteredURLs[filterCriteriaIndex].push(url);
+                        }
                     }
                     catch (err) {
                         /* Reached the end of activities for this page.  There are less than 50 activities on
                          * this page (should only occur for last page) */
-                        //console.log("End of " + criteria + " data @ " + ((pageNumber - 1) * 50 + i + 1));
-                        break;
+                        return Parse.Promise.as(filterCriteria[filterCriteriaIndex] + " (Page " + pageNumber +
+                                    ") URLs have been extracted!");
                     }
                 }
             });
+        // Error handler if webpage does not exist
+        }, function(httpResponse) {
+            return Parse.Promise.error("Could not retrieve " + filterCriteria[filterCriteriaIndex] + " web page #" +
+                        pageNumber + ".  Error code: " + httpResponse.status);
+        });
+    }
 
-            /* Update any activities that showed up on this filtered activity list and set its filter criteria value to
-             * true (if it was set to false or undefined previously */
+    // This function sets the filter criteria for all activities
+    function filterAssignment(filterCriteriaIndex) {
+        /* This promise is monitored by overallScrapePromise and is added to the promises array.  There is a
+         * filterAssignmentPromise promise for each filter criteria. */
+        var filterAssignmentPromise = new Parse.Promise();
+        var query;
+        var filter = filterCriteria[filterCriteriaIndex];
 
-              // Get list of Parse objects that correspond to the activity URLs
+        // Get list of Parse objects that correspond to the activity URLs
+        query = new Parse.Query(ActivityClass);  // Create new query
+        // ... where the object corresponds to one of the filtered activity URLs
+        query.containedIn("activityUrl", filteredURLs[filterCriteriaIndex]);
+        // ... where the filter criteria value is currently not true (i.e. false or undefined)
+        query.notEqualTo(filter, true);
+        /* ... give us only this filter criteria field of interest (do not send other fields to minimize resource
+         * usage) */
+        query.select(filter);
+        query.limit(1000);  // Set query results to the max of 1000
+
+        // Launch query and retrieve objects matching the specified query
+        query.find().then(function (results) {
+            // If any activities are returned matching our criteria then update and save
+            if (results.length !== 0) {
+                for (var i = 0; i < results.length; i++) {
+                    results[i].set(filter, true);  // Set this filter criteria value to true
+                }
+
+                console.log(filter + " was set true for " + results.length + " activities.");
+                return Parse.Object.saveAll(results);  // Save all results
+            }
+            else {  // No activities found so no updates needed
+                return Parse.Promise.as("No updates needed");  // Return resolved promise to move onto next step
+            }
+        }).then(function (results) {
+            /* Update any activities that did not show up on this filtered activity list to set its filter criteria
+             * value to false (if it was set to true previously) */
+
+            // Get list of Parse objects that do not correspond to the activity URLs
             query = new Parse.Query(ActivityClass);  // Create new query
-            // ... where the object corresponds to one of the filtered activity URLs
-            query.containedIn("activityUrl", activityURLs);
-
-            // ... where the activity start date occurs sometime in the future (includes current day)
-            /* Note that the time below is adjusting a day back since an activity date is saved at the beginning of
-             * its day (i.e. at midnight).  The time is further adjusted to account for the Parse server being set
-             * at UTC, while all activities are in PST (-7). */
-            //query.greaterThan("activityStartDate", new Date(new Date().getTime() - ((24 + 7) * 60 * 60 * 1000)));
-
-            // ... where the filter criteria value is currently not true (i.e. false or undefined)
-            query.notEqualTo(criteria, true);
+            // ... where the object does not correspond to one of the filtered activity URLs
+            query.notContainedIn("activityUrl", filteredURLs[filterCriteriaIndex]);
+            // ... where the filter criteria value is currently true
+            query.equalTo(filter, true);
             /* ... give us only this filter criteria field of interest (do not send other fields to minimize resource
              * usage) */
-            query.select(criteria);
+            query.select(filter);
             query.limit(1000);  // Set query results to the max of 1000
 
             // Launch query and retrieve objects matching the specified query
-            query.find().then(function (results) {
-                // If any activities are returned matching our criteria then update and save
-                if (results.length !== 0) {
-                    for (var i = 0; i < results.length; i++) {
-                        results[i].set(criteria, true);  // Set this filter criteria value to true
-                    }
-
-                    return Parse.Object.saveAll(results);  // Save all results
+            return query.find();
+        }).then(function (results) {
+            // If any activities are returned matching our criteria then update and save
+            if (results.length !== 0) {
+                for (var i = 0; i < results.length; i++) {
+                    results[i].set(filter, false);  // Set this filter criteria value to false
                 }
-                else {  // No activities found so no updates needed
-                    return Parse.Promise.as("No updates needed");  // Return resolved promise to move onto next step
-                }
-//            }).then(function (results) {
-//                /* Update any activities that did not show up on this filtered activity list to set its filter criteria
-//                 * value to false (if it was set to true previously) */
-//
-//                 // Get list of Parse objects that do not correspond to the activity URLs
-//                query = new Parse.Query(ActivityClass);  // Create new query
-//                // ... where the object does not correspond to one of the filtered activity URLs
-//                query.notContainedIn("activityUrl", activityURLs);
-//
-//                // ... where the activity start date occurs sometime in the future (includes current day)
-//                /* Note that the time below is adjusting a day back since an activity date is saved at the beginning of
-//                 * its day (i.e. at midnight).  The time is further adjusted to account for the Parse server being set
-//                 * at UTC, while all activities are in PST (-7). */
-//                //query.greaterThan("activityStartDate", new Date(new Date().getTime() - ((24 + 7) * 60 * 60 * 1000)));
-//
-//                // ... where the activity was updated more than 5 minutes ago
-//                /* Only activities last updated more than 2 minutes ago should be updated.  This would prevent us from
-//                 * changing the activities that were just changed to true in the promise above. */
-//                query.lessThan("updatedAt", new Date(new Date().getTime() - (2 * 60 * 1000)));
-//
-//                // ... where the filter criteria value is currently true
-//                query.equalTo(criteria, true);
-//                /* ... give us only this filter criteria field of interest (do not send other fields to minimize resource
-//                 * usage) */
-//                query.select(criteria);
-//                query.limit(1000);  // Set query results to the max of 1000
-//
-//                // Launch query and retrieve objects matching the specified query
-//                return query.find();
-//            }).then(function (results) {
-//                // If any activities are returned matching our criteria then update and save
-//                if (results.length !== 0) {
-//                    for (var i = 0; i < results.length; i++) {
-//                        results[i].set(criteria, false);  // Set this filter criteria value to false
-//                    }
-//
-//                    console.log(criteria + " was set false for " + results.length + " activities.");
-//                    return Parse.Object.saveAll(results);  // Save all results
-//                }
-//                else {  // No activities found so no updates needed
-//                    return Parse.Promise.as("No updates needed");  // Return resolved promise to move onto next step
-//                }
-            }).then(function (results) {
-                filterAssignmentPromise.resolve(criteria + " has been updated!");
-            }, function (error) {
-                filterAssignmentPromise.reject("Could not update " + criteria + ".  " + error.message);
-            });
 
-            // Error handler if webpage does not exist
-        }, function(error) {
-            filterAssignmentPromise.reject("Could not retrieve " + criteria + " web page #" + pageNumber +
-                        ".  Error code: " + httpResponse.status);
+                console.log(filter + " was set false for " + results.length + " activities.");
+                return Parse.Object.saveAll(results);  // Save all results
+            }
+            else {  // No activities found so no updates needed
+                return Parse.Promise.as("No updates needed");  // Return resolved promise to move onto next step
+            }
+        }).then(function (results) {
+            filterAssignmentPromise.resolve(filter + " has been updated!");
+        }, function (error) {  // Error encountered
+            console.log("Could not update " + filter + ".  " + error.message);
+
+            // No big deal - the filters will be updated on the next scraping (run every x minutes on Parse)
+            filterAssignmentPromise.resolve("Error encountered with " + filter);
         });
 
         return filterAssignmentPromise;  // Return promise so it can be added to the promises array
@@ -707,18 +695,16 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
      * 1. Download the first page of results for future events
      * 2. Extract from the webpage response the total number of webpages that make up the entirety of the activities list
      * 3. Add all pages to be scraped into a grouped promise and run scraping tasks for all pages
-     * 4. Once all promises have been completed, begin the filter options scraping
-     * n. ...
-     * n. Send resolve or reject notification to completion handler to report final status and exit
+     * 4. Once all promises have been completed, begin the individual activity URL scraping (using same promise array approach)
+     * 5. Once all URLs have been extracted, start the filter assignment process (using same promise array approach)
+     *      - this task involves looking up activity based on the URL
+     *      - check if the filter value has changed - if so, set the new value and save
+     * 6. Send resolve or reject notification to completion handler to report final status and exit
      */
 
     // Request the first page of results to determine total number of pages (based on links at bottom of page)
     Parse.Cloud.httpRequest({
-        // All activities in the future
-//            url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=0"
-        // All activities in past, present and future
-        url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=0" +
-                "&c6:list=1970-01-01&c6:list=9999-12-31"
+        url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=0" + dateRange
     }).then(function(httpResponse) {
         var html = httpResponse.text;
 
@@ -739,8 +725,8 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         }
 
         return Parse.Promise.when(promises);  // Wait until all promises return resolved (or there is a rejection)
-    }, function (error) {  // Could not retrieve initial website
-        return Parse.Promise.error("Initial web page request failed with response code " + error.message);
+    }, function (httpResponse) {  // Could not retrieve initial website
+        return Parse.Promise.error("Initial web page request failed with response code " + httpResponse.status);
     }).then(function() {
         promises.length = 0;  // Clear the promises array
 
@@ -753,11 +739,25 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     }).then(function() {
         promises.length = 0;  // Clear the promises array
 
+        // Initialize filteredURLs array
+        for (var i = 0; i < filterCriteria.length; i++) {
+            filteredURLs[i] = [];
+        }
+
+        // Start the filter assignment task for each category (iterate over the total number of pages
+        for (i = 0; i < filterCriteria.length; i++) {
+            for (var j = 1; j <= filterTotalPages[i]; j++) {
+                promises.push(getFilteredURLs(i, filterBaseUrl[i], j));
+            }
+        }
+
+        return Parse.Promise.when(promises);  // Wait until all promises return resolved (or there is a rejection)
+    }).then(function() {
+        promises.length = 0;  // Clear the promises array
+
         // Start the filter assignment task for each category (iterate over the total number of pages
         for (var i = 0; i < filterCriteria.length; i++) {
-            for (var j = 1; j <= filterTotalPages[i]; j++) {
-                promises.push(filterAssignment(filterCriteria[i], filterBaseUrl[i], j));
-            }
+            promises.push(filterAssignment(i));
         }
 
         return Parse.Promise.when(promises);  // Wait until all promises return resolved (or there is a rejection)
