@@ -9,6 +9,11 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     var ActivityClass = Parse.Object.extend("ActivityAll");  // Make connection to 'Activity' class
     var promises = [];  // This variable will hold all of the webpage scraping activity promises
     var orphanedActivities = 0;  // This will keep track of how many activities have lost their way (i.e. webpage)
+    var newActivities = 0;  // Counter for new activities added
+    var updatedActivities = 0;  // Counter for updated existing activities
+    var trueCounter = 0;  // Keeps track of the number of filter criteria set to true
+    var falseCounter = 0;  // Keeps track of the number of filter criteria set to false
+    var totalActivities;
 
     //var dateRange = "&c6:list=1970-01-01&c6:list=9999-12-31";  // All activities
     var dateRange = "";  // All activities in the future (including today)
@@ -135,8 +140,10 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     // Define listener to handle completion event
     var onCompletionListener = new Parse.Promise();  // Create a trivial resolved promise as a base case
     onCompletionListener.then(function() {  // Overall job was successful
-        status.success("Activities successfully updated!  " + orphanedActivities
-            + " activities have been orphaned (i.e. no longer have working web pages).");
+        status.success("A total of " + totalActivities + " activities were reviewed: " + newActivities +
+                " activities added and " + updatedActivities + " activities updated.  " + trueCounter +
+                " filter criteria set to true and " + falseCounter + " filter criteria set to false.  " +
+                orphanedActivities + " activities have been orphaned (i.e. no longer have working web pages).");
     }, function(error) {  // Overall job failed
         status.error(error.toString());
     });
@@ -232,7 +239,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         return keywords;  // Return array of unique qualified keywords
     }
 
-    // TODO: Add a check if there is one activity on the last page to see if it matches the last entry on the previous page.  If so, do not add duplicate!
     // This function scrapes each activity webpage and extracts its activities
     function scrapeActivityList(pageNumber) {
         /* This promise is monitored by overallScrapePromise and is added to the promises array.  There is an
@@ -248,8 +254,11 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
             // Use xmlreader to parse HTML code for the first entry and put into the 'Activity' class
             xmlreader.read(html, function (err, doc) {
-                var name;
                 var activityUrl;
+                var name;
+                var type;
+                var imageURL;
+                var branch;
                 var regInfo;
                 var regDate;
                 var availabilityParticipant;
@@ -257,12 +266,16 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                 var desc;
                 var difficulty;
                 var activityDate;
+                var prereq;
                 var startDate;
                 var endDate;
                 var leader;
                 var isQYL;
                 var keywords = [];
+                var previousKeywords = [];
                 var additionalInfoPromise;
+                var exists;
+                var keywordMatch;
                 var i = -1;
 
                 // There are 50 items on each webpage (except for the last page).  All items start at 0.
@@ -272,10 +285,14 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                     if (i < 50) {
                         // Represents the activity that will be saved/updated to/in the backend
                         var activityObj = new ActivityClass();
+                        var query;
 
                         // Clear the fields so that the information is not used incorrectly for the next activity
-                        name = null;
                         activityUrl = null;
+                        name = null;
+                        type = null;
+                        imageURL = null;
+                        branch = null;
                         regInfo = null;
                         regDate = null;
                         availabilityParticipant = null;
@@ -283,200 +300,364 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                         desc = null;
                         difficulty = null;
                         activityDate = null;
+                        prereq = null;
                         startDate = null;
                         endDate = null;
                         leader = null;
                         keywords.length = 0;
+                        previousKeywords.length = 0;
+                        exists = false;
+                        keywordMatch = false;
 
                         try {
                             // Webpage Address: HREF at /html/body/div[i]/div[2]/h3/a
                             activityUrl = doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).attributes().HREF;
-
-                            // Check to see if this activity URL already exists
-
-
-                            activityObj.set("activityUrl", activityUrl);
-
-                            // Name: /html/body/div[i]/div[2]/h3/a
-                            name = doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).text();
-                            activityObj.set("name", name);
-
-                            // Type: /html/body/div[i]/div[2]/div[1]
-                            activityObj.set("type", doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(0).text());
-
-                            // Picture: /html/body/div[i]/a/img
-                            activityObj.set("imgUrl", doc.HTML.BODY.DIV.at(i).A.at(0).IMG.at(0).attributes().SRC);
-
-                            // Branch: /html/body/div[i]/div[1]/div[2]
-                            activityObj.set("branch", doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(1).text());
-
-                            /* Availability - Participant: /html/body/div[i]/div[1]/div[1]/span/strong or
-                                                           /html/body/div[i]/div[1]/div[1]/span[1]/strong */
-                            availabilityParticipant = Number(doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).SPAN.at(0)
-                                    .STRONG.at(0).text());
-
-                            // Get the description text that comes after this number
-                            desc = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).SPAN.at(0).text();
-
-                            // Check to see if this number represents the waitlist
-                            if (desc.toLowerCase().indexOf("waitlist") !== -1) {
-                                // Make the waitlist number negative
-                                availabilityParticipant = -1 * availabilityParticipant;
-                            }
-
-                            activityObj.set("availabilityParticipant", availabilityParticipant);
-
-                            /* Availability - Leader: /html/body/div[i]/div[1]/div[1]/span[2]/strong
-                             * The leader availability may not apply and therefore not exist, but due to the code in
-                             * sax.js, no error is produced.  Instead, the value at the root SPAN is taken, which
-                             * corresponds to the availability for participants.  This is not correct, so we first need
-                             * to check if the value returned applies to "participant" or "leader". */
-                            // Get the description text that comes after the expected leader availability
-                            desc = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).SPAN.at(1).text();
-
-                            // Check to see if this number represents the leader availability
-                            if (desc.toLowerCase().indexOf("leader") !== -1) {
-                                // This does represent leader availability, so retrieve the number
-                                availabilityLeader = Number(doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).SPAN.at(1)
-                                        .STRONG.at(0).text());
-
-                                // Check to see if this number represents the waitlist
-                                if (desc.toLowerCase().indexOf("waitlist") !== -1) {
-                                    // Make the waitlist number negative
-                                    availabilityLeader = -1 * availabilityLeader;
-                                }
-
-                                activityObj.set("availabilityLeader", availabilityLeader);
-                            }
-
-                            // Difficulty: /html/body/div[i]/div[2]/div[2]
-                            difficulty = doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(1).text();
-
-                            // Find out if the difficulty rating for this activity is missing
-                            if (difficulty.toLowerCase().indexOf("difficulty") !== -1) {
-                                activityObj.set("difficulty", difficulty);
-
-                                // Activity date(s): /html/body/div[i]/div[2]/div[3]
-                                activityDate = doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(2).text();
-
-                                // Prerequisites: /html/body/div[i]/div[2]/div[4]
-                                activityObj.set("prereq", doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(3).text());
-                            }
-                            /* Difficulty rating is missing, so Activity Date(s) and Prerequisites are off in position
-                             * (shifted one DIV up at last level) */
-                            else {
-                                activityObj.set("difficulty", "");
-
-                                // Activity date(s): /html/body/div[i]/div[2]/div[2]
-                                activityDate = difficulty;  // Use the expected Difficulty value
-
-                                // Prerequisites: /html/body/div[i]/div[2]/div[3]
-                                activityObj.set("prereq", doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(2).text());
-                            }
-
-                            // Extract the dates from the Activity Date String
-                            if (activityDate.indexOf("-") > 0) {  // Represents actual date range
-                                startDate = new Date(activityDate.substring(0, activityDate.indexOf("-") - 1).trim());
-                                endDate = new Date(activityDate.substring(activityDate.indexOf("-") + 1).trim());
-                            }
-                            else {  // Single day activity
-                                startDate = new Date(activityDate);
-                                endDate = new Date(activityDate);
-                            }
-
-                            // Activity start and end dates
-                            activityObj.set("activityStartDate", startDate);
-                            activityObj.set("activityEndDate", endDate);
-
-                            // Registration information: /html/body/div[i]/div[1]/div[1]/div
-                            regInfo = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).DIV.at(0).text().replace("\n", "").trim();
-
-                            // Check to make sure activity has not been canceled
-                            if (regInfo.toLowerCase() != "canceled") {
-                                // Get the date portion of the registration info string
-                                regDate = regInfo.substring(regInfo.indexOf(" ", regInfo.length - 7) + 1);
-
-                                // Get the registration date as a Date object
-                                regDate = new Date(regDate);
-
-                                // Assign year to regDate since none is provided
-                                if (regDate.getMonth() > startDate.getMonth()) {  // Happened in the previous year
-                                    // Set as previous year relative to startDate
-                                    regDate.setFullYear(startDate.getFullYear() - 1);
-                                }
-                                else {  // Happened earlier in the year or in the same month - assume same year
-                                    regDate.setFullYear(startDate.getFullYear());  // Set as startDate's year
-                                }
-
-                                // Check to see if this is an opening or closing registration date
-                                    if (regInfo.toLowerCase().indexOf("open") !== -1) {  // Opening
-                                        activityObj.set("registrationOpenDate", regDate);
-                                    }
-                                    else {  // Closing
-                                        activityObj.set("registrationCloseDate", regDate);
-                                    }
-                            }
-                            else {  // Activity has been canceled
-                                activityObj.set("isCanceled", true);
-                            }
                         }
-                        /* This error handler catches any attempt to read an entry beyond those that exist on this page
-                         * or any failed attempt at obtaining data that does not exist for the given activity */
                         catch (err) {
-                            // Show the activity name where the error occurred
-                            if (name === null) {
-                                /* Reached the end of activities for this page.  There are less than 50 activities on
-                                 * this page (should only occur for last page) */
-                                console.log("End of data @ " + ((pageNumber - 1) * 50 + i + 1));
+                            /* Reached the end of activities for this page.  There are less than 50 activities on
+                             * this page (should only occur for last page) */
+                            totalActivities = (pageNumber - 1) * 50 + i;
 
-                                // Resolve this promise (end of this promise thread)
-                                activityListScrapePromise.resolve("Page " + pageNumber + " complete!");
-                            }
-                            else {
-                            /* Error while scraping data for real activity.  Display the message but continue to finish
-                             * the process for this activity.  This is an error on the activity level and not an
-                             * overall process error so just continue. */
-                                console.error("Error scraping data fields @ " +
-                                        ((pageNumber - 1) * 50 + i + 1) + ": " + err.message);
-                            }
+                            // Resolve this promise (end of this promise thread)
+                            activityListScrapePromise.resolve("Page " + pageNumber + " complete!");
+
+                            i = 50;  // Force out of the "loop" early
                         }
 
-                        /* Scrape GPS coords and save activity only if it is valid (invalid entry would be the first
-                         * null entry on last page of results) */
-                        if (name !== null) {
-                            // Get keywords from activity name field
-                            keywords = getKeywords(name, true);
+                        // If not at the end of the results
+                        if (activityUrl !== null) {
+                            // Check to see if this activity URL already exists
+                            query = new Parse.Query(ActivityClass);  // Create new query
+                            // ... where the object corresponds to one of the filtered activity URLs
+                            query.equalTo("activityUrl", activityUrl);
 
-                            // GPS Coordinates
-                            additionalInfoPromise = Parse.Promise.as();  // Create a trivial resolved promise as a base case
-                            additionalInfoPromise = additionalInfoPromise.then(function() {
-                                return scrapeAdditionalInfo(activityUrl);
-                            }).then(function(additionalInfo) {
-                                // Leader information
-                                leader = additionalInfo[0];
-                                activityObj.set("leader", leader);
-                                activityObj.set("isQYL", additionalInfo[1]);
+                            // Launch query and retrieve object matching the specified query
+                            query.first().then(function (object) {  // Previous activity found
+                                // Check if a duplicate activity was found
+                                if (typeof object !== "undefined") {  // Duplicate found so use this existing object
+                                    // Use the existing activity object
+                                    activityObj = object;
+                                    exists = true;
+                                }
+
+                                return Parse.Promise.as();
+                            }, function (error) {  // Query was not able to run
+                                console.log("Not able to check if activity is duplicate");
+                                return Parse.Promise.error("Not able to check if activity is duplicate");
+                            }).then(function () {
+                                try {
+                                    if (activityUrl !== activityObj.get("activityUrl")) {
+                                        activityObj.set("activityUrl", activityUrl);
+                                    }
+
+                                    // Name: /html/body/div[i]/div[2]/h3/a
+                                    name = doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).text();
+                                    if (name !== activityObj.get("name")) {
+                                        activityObj.set("name", name);
+                                    }
+
+                                    // Type: /html/body/div[i]/div[2]/div[1]
+                                    type = doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(0).text();
+                                    if (type !== activityObj.get("type")) {
+                                        activityObj.set("type", type);
+                                    }
+
+                                    // Picture: /html/body/div[i]/a/img
+                                    imageURL = doc.HTML.BODY.DIV.at(i).A.at(0).IMG.at(0).attributes().SRC;
+                                    if (imageURL !== activityObj.get("imgUrl")) {
+                                        activityObj.set("imgUrl", imageURL);
+                                    }
+
+                                    // Branch: /html/body/div[i]/div[1]/div[2]
+                                    branch = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(1).text();
+                                    if (branch !== activityObj.get("branch")) {
+                                        activityObj.set("branch", branch);
+                                    }
+
+                                    /* Availability - Participant: /html/body/div[i]/div[1]/div[1]/span/strong or
+                                     /html/body/div[i]/div[1]/div[1]/span[1]/strong */
+                                    availabilityParticipant = Number(doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).SPAN
+                                                .at(0).STRONG.at(0).text());
+
+                                    // Get the description text that comes after this number
+                                    desc = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).SPAN.at(0).text();
+
+                                    // Check to see if this number represents the waitlist
+                                    if (desc.toLowerCase().indexOf("waitlist") !== -1) {
+                                        // Make the waitlist number negative
+                                        availabilityParticipant = -1 * availabilityParticipant;
+                                    }
+
+                                    if (availabilityParticipant !== activityObj.get("availabilityParticipant")) {
+                                        activityObj.set("availabilityParticipant", availabilityParticipant);
+                                    }
+
+                                    /* Availability - Leader: /html/body/div[i]/div[1]/div[1]/span[2]/strong
+                                     * The leader availability may not apply and therefore not exist, but due to the code in
+                                     * sax.js, no error is produced.  Instead, the value at the root SPAN is taken, which
+                                     * corresponds to the availability for participants.  This is not correct, so we first need
+                                     * to check if the value returned applies to "participant" or "leader". */
+                                    // Get the description text that comes after the expected leader availability
+                                    desc = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).SPAN.at(1).text();
+
+                                    // Check to see if this number represents the leader availability
+                                    if (desc.toLowerCase().indexOf("leader") !== -1) {
+                                        // This does represent leader availability, so retrieve the number
+                                        availabilityLeader = Number(doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).SPAN
+                                                    .at(1).STRONG.at(0).text());
+
+                                        // Check to see if this number represents the waitlist
+                                        if (desc.toLowerCase().indexOf("waitlist") !== -1) {
+                                            // Make the waitlist number negative
+                                            availabilityLeader = -1 * availabilityLeader;
+                                        }
+
+
+                                        if (availabilityLeader !== activityObj.get("availabilityLeader")) {
+                                            activityObj.set("availabilityLeader", availabilityLeader);
+                                        }
+                                    }
+
+                                    // Difficulty: /html/body/div[i]/div[2]/div[2]
+                                    difficulty = doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(1).text();
+
+                                    // Find out if the difficulty rating for this activity is missing
+                                    if (difficulty.toLowerCase().indexOf("difficulty") !== -1) {
+                                        if (difficulty !== activityObj.get("difficulty")) {
+                                            activityObj.set("difficulty", difficulty);
+                                        }
+
+                                        // Activity date(s): /html/body/div[i]/div[2]/div[3]
+                                        activityDate = doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(2).text();
+
+                                        // Prerequisites: /html/body/div[i]/div[2]/div[4]
+                                        prereq = doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(3).text();
+                                        if (prereq !== activityObj.get("prereq")) {
+                                            activityObj.set("prereq", prereq);
+                                        }
+
+                                    }
+                                    /* Difficulty rating is missing, so Activity Date(s) and Prerequisites are off in position
+                                     * (shifted one DIV up at last level) */
+                                    else {
+                                        if (activityObj.get("difficulty") !== "") {
+                                            activityObj.set("difficulty", "");
+                                        }
+
+                                        // Activity date(s): /html/body/div[i]/div[2]/div[2]
+                                        activityDate = difficulty;  // Use the expected Difficulty value
+
+                                        // Prerequisites: /html/body/div[i]/div[2]/div[3]
+                                        prereq = doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(2).text();
+                                        if (prereq !== activityObj.get("prereq")) {
+                                            activityObj.set("prereq", prereq);
+                                        }
+                                    }
+
+                                    // Extract the dates from the Activity Date String
+                                    if (activityDate.indexOf("-") > 0) {  // Represents actual date range
+                                        startDate = new Date(activityDate.substring(0, activityDate.indexOf("-") - 1)
+                                                    .trim());
+                                        endDate = new Date(activityDate.substring(activityDate.indexOf("-") + 1).trim());
+                                    }
+                                    else {  // Single day activity
+                                        startDate = new Date(activityDate);
+                                        endDate = new Date(activityDate);
+                                    }
+
+                                    // Activity start and end dates
+                                    // Check if the backend has a date set
+                                    if (typeof activityObj.get("activityStartDate") !== "undefined") {  // No date
+                                        // Check if the dates match - if not, save the new date
+                                        if (startDate.getTime() !== activityObj.get("activityStartDate").getTime()) {
+                                            activityObj.set("activityStartDate", startDate);
+                                        }
+                                    }
+                                    else {  // No date in backend - save the new date
+                                        activityObj.set("activityStartDate", startDate);
+                                    }
+
+                                    // Check if the backend has a date set
+                                    if (typeof activityObj.get("activityEndDate") !== "undefined") {  // No date
+                                        // Check if the dates match - if not, save the new date
+                                        if (endDate.getTime() !== activityObj.get("activityEndDate").getTime()) {
+                                            activityObj.set("activityEndDate", endDate);
+                                        }
+                                    }
+                                    else {  // No date in backend - save the new date
+                                        activityObj.set("activityEndDate", endDate);
+                                    }
+
+                                    // Registration information: /html/body/div[i]/div[1]/div[1]/div
+                                    regInfo = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).DIV.at(0).text()
+                                                .replace("\n", "").trim();
+
+                                    // Check to make sure activity has not been canceled
+                                    if (regInfo.toLowerCase() != "canceled") {
+                                        // Get the date portion of the registration info string
+                                        regDate = regInfo.substring(regInfo.indexOf(" ", regInfo.length - 7) + 1);
+
+                                        // Get the registration date as a Date object
+                                        regDate = new Date(regDate);
+
+                                        // Assign year to regDate since none is provided
+                                        if (regDate.getMonth() > startDate.getMonth()) {  // Happened in the previous year
+                                            // Set as previous year relative to startDate
+                                            regDate.setFullYear(startDate.getFullYear() - 1);
+                                        }
+                                        else {  // Happened earlier in the year or in the same month - assume same year
+                                            regDate.setFullYear(startDate.getFullYear());  // Set as startDate's year
+                                        }
+
+                                        // Check to see if this is an opening or closing registration date
+                                        if (regInfo.toLowerCase().indexOf("open") !== -1) {  // Opening
+                                            // Check if the backend has a date set
+                                            if (typeof activityObj.get("registrationOpenDate") !== "undefined") {  // No date
+                                                // Check if the dates match - if not, save the new date
+                                                if (regDate.getTime() !== activityObj.get("registrationOpenDate")
+                                                        .getTime()) {
+                                                    activityObj.set("registrationOpenDate", regDate);
+                                                }
+                                            }
+                                            else {  // No date in backend - save the new date
+                                                activityObj.set("registrationOpenDate", regDate);
+                                            }
+                                        }
+                                        else {  // Closing
+                                            // Check if the backend has a date set
+                                            if (typeof activityObj.get("registrationCloseDate") !== "undefined") {  // No date
+                                                // Check if the dates match - if not, save the new date
+                                                if (regDate.getTime() !== activityObj.get("registrationCloseDate")
+                                                        .getTime()) {
+                                                    activityObj.set("registrationCloseDate", regDate);
+                                                }
+                                            }
+                                            else {  // No date in backend - save the new date
+                                                activityObj.set("registrationCloseDate", regDate);
+                                            }
+                                        }
+
+                                        if (activityObj.get("isCanceled") === true) {
+                                            activityObj.set("isCanceled", false);
+                                        }
+                                    }
+                                    else {  // Activity has been canceled
+                                        if (activityObj.get("isCanceled") !== true) {
+                                            activityObj.set("isCanceled", true);
+                                        }
+                                    }
+                                }
+                                catch (err) {
+                                    /* Error while scraping data for real activity.  Display the message but continue to
+                                     * finish the process for this activity.  This is an error on the activity level and not
+                                     * an overall process error so just continue. */
+                                    console.error("Error scraping data fields @ " +
+                                        ((pageNumber - 1) * 50 + i + 1) + ": " + err.message);
+                                }
+
+                                /* Scrape GPS coords and save activity only if it is valid (invalid entry would be the first
+                                 * null entry on last page of results) */
+                                // Get keywords from activity name field
+                                keywords = getKeywords(name, true);
+
+                                // GPS Coordinates
+                                // Create a trivial resolved promise as a base case
+                                additionalInfoPromise = Parse.Promise.as();
+                                additionalInfoPromise = additionalInfoPromise.then(function () {
+                                    return scrapeAdditionalInfo(activityUrl);
+                                }).then(function (additionalInfo) {
+                                    // Leader information
+                                    leader = additionalInfo[0];
+                                    if (leader !== activityObj.get("leader")) {
+                                        activityObj.set("leader", leader);
+                                    }
+                                    if (additionalInfo[1] !== activityObj.get("isQYL")) {
+                                        activityObj.set("isQYL", additionalInfo[1]);
+                                    }
 
                                     // Assign GPS coordinates
-                                activityObj.set("startLat", additionalInfo[2] === "" ? undefined :
+                                    if (activityObj.get("startLat") !== (additionalInfo[2] === "" ? undefined :
+                                        Number(additionalInfo[2]))) {
+                                        activityObj.set("startLat", additionalInfo[2] === "" ? undefined :
                                             Number(additionalInfo[2]));
-                                activityObj.set("startLong", additionalInfo[3] === "" ? undefined :
+                                    }
+                                    if (activityObj.get("startLong") !== (additionalInfo[3] === "" ? undefined :
+                                        Number(additionalInfo[3]))) {
+                                        activityObj.set("startLong", additionalInfo[3] === "" ? undefined :
                                             Number(additionalInfo[3]));
-                                activityObj.set("endLat", additionalInfo[4] === "" ? undefined :
+                                    }
+                                    if (activityObj.get("endLat") !== (additionalInfo[4] === "" ? undefined :
+                                        Number(additionalInfo[4]))) {
+                                        activityObj.set("endLat", additionalInfo[4] === "" ? undefined :
                                             Number(additionalInfo[4]));
-                                activityObj.set("endLong", additionalInfo[5] === "" ? undefined :
+                                    }
+                                    if (activityObj.get("endLong") !== (additionalInfo[5] === "" ? undefined :
+                                        Number(additionalInfo[5]))) {
+                                        activityObj.set("endLong", additionalInfo[5] === "" ? undefined :
                                             Number(additionalInfo[5]));
+                                    }
 
-                                // Get keywords from leader field only if there is a leader value
-                                if (leader !== null) {
-                                    keywords = keywords.concat(getKeywords(leader, false));
-                                }
+                                    // Get keywords from leader field only if there is a leader value
+                                    if (leader !== null) {
+                                        keywords = keywords.concat(getKeywords(leader, false));
+                                    }
 
-                                activityObj.set("keywords", keywords);  // Keywords for search
+                                    // Check if the keywords were previously defined
+                                    if (typeof activityObj.get("keywords") !== "undefined") {  // Previously defined
+                                        // Get the previous keywords
+                                        previousKeywords = activityObj.get("keywords");
 
-                                // Save activity object
-                                activityObj.save(null, {
-                                    success: function(activityObjSave) {
+                                        // Compare the string array lengths
+                                        if (keywords.length === previousKeywords.length) {  // Same length
+                                            /* Go through the words and make compare the two sets (will be in the same
+                                             * order if they're the same) */
+                                            for (var j = 0; j < keywords.length; j++) {
+                                                if (keywords[j] !== previousKeywords[j]) {
+                                                    activityObj.set("keywords", keywords);  // Keywords for search
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        else {  // Different length
+                                            activityObj.set("keywords", keywords);  // Keywords for search
+                                        }
+                                    }
+                                    else {  // Not previously defined
+                                        activityObj.set("keywords", keywords);  // Keywords for search
+                                    }
+
+                                    // Check if any field have changed if it is an existing entry
+                                    if (activityObj.dirtyKeys().length !== 0) {  // Fields have changed
+                                        // Save activity object
+                                        activityObj.save(null, {
+                                            success: function (activityObjSave) {
+                                                // Update activity counters
+                                                if (!exists) {
+                                                    newActivities++;
+                                                }
+                                                else {
+                                                    updatedActivities++;
+                                                }
+
+                                                // Move on to the next activity on this page
+                                                if (i < 49) {
+                                                    scrapeNextActivity();
+                                                }
+                                                // Save represents the 50th activity on this page
+                                                else {  // Scraping of this page complete
+                                                    // Resolve this promise (end of this promise thread)
+                                                    activityListScrapePromise.resolve("Page " + pageNumber + " complete!");
+                                                }
+                                            },
+                                            // Error saving activity to Parse class
+                                            error: function (activityObjSave, error) {
+                                                // Reject this promise and send error
+                                                activityListScrapePromise.reject("Failed to create new object.  Error code "
+                                                    + error.code + ": " + error.message);
+                                            }
+                                        });
+                                    }
+                                    else {  // No fields have changed so don't save it to the backend
                                         // Move on to the next activity on this page
                                         if (i < 49) {
                                             scrapeNextActivity();
@@ -486,42 +667,86 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                             // Resolve this promise (end of this promise thread)
                                             activityListScrapePromise.resolve("Page " + pageNumber + " complete!");
                                         }
-                                    },
-                                    error: function(activityObjSave, error) {  // Error saving activity to Parse class
-                                        // Reject this promise and send error
-                                        activityListScrapePromise.reject("Failed to create new object.  Error code "
+                                    }
+                                }, function (error) {
+                                    /* If the activity had been removed but still points to a non-existent link, we'll
+                                     * get an error.  This information is still saved.  This is an error on the activity
+                                     * level and not an overall process error so just continue scraping activities. */
+                                    console.error("Error code " + error + " for \"" + name + "\": " + activityUrl);
+                                    orphanedActivities++;
+
+                                    // Check if the keywords were previously defined
+                                    if (typeof activityObj.get("keywords") !== "undefined") {  // Previously defined
+                                        // Get the previous keywords
+                                        previousKeywords = activityObj.get("keywords");
+
+                                        // Compare the string array lengths
+                                        if (keywords.length === previousKeywords.length) {  // Same length
+                                            /* Go through the words and make compare the two sets (will be in the same
+                                             * order if they're the same) */
+                                            for (var j = 0; j < keywords.length; j++) {
+                                                if (keywords[j] !== previousKeywords[j]) {
+                                                    activityObj.set("keywords", keywords);  // Keywords for search
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        else {  // Different length
+                                            activityObj.set("keywords", keywords);  // Keywords for search
+                                        }
+                                    }
+                                    else {  // Not previously defined
+                                        activityObj.set("keywords", keywords);  // Keywords for search
+                                    }
+
+                                    // Check if any field have changed if it is an existing entry
+                                    if (activityObj.dirtyKeys().length !== 0) {  // Fields have changed
+                                        // Save activity object
+                                        activityObj.save(null, {
+                                            success: function (activityObjSave) {
+                                                // Update activity counters
+                                                if (!exists) {
+                                                    newActivities++;
+                                                }
+                                                else {
+                                                    updatedActivities++;
+                                                }
+
+                                                // Move on to the next activity on this page
+                                                if (i < 49) {
+                                                    scrapeNextActivity();
+                                                }
+                                                // Save represents the 50th activity on this page
+                                                else {  // Scraping of this page complete
+                                                    // Resolve this promise (end of this promise thread)
+                                                    activityListScrapePromise.resolve("Page " + pageNumber + " complete!");
+                                                }
+                                            },
+                                            // Error saving activity to Parse class
+                                            error: function (activityObjSave, error) {
+                                                // Reject this promise and send error
+                                                activityListScrapePromise.reject("Failed to create new object.  Error code "
                                                     + error.code + ": " + error.message);
+                                            }
+                                        });
+                                    }
+                                    else {  // No fields have changed so don't save it to the backend
+                                        // Move on to the next activity on this page
+                                        if (i < 49) {
+                                            scrapeNextActivity();
+                                        }
+                                        // Save represents the 50th activity on this page
+                                        else {  // Scraping of this page complete
+                                            // Resolve this promise (end of this promise thread)
+                                            activityListScrapePromise.resolve("Page " + pageNumber + " complete!");
+                                        }
                                     }
                                 });
                             }, function(error) {
-                                /* If the activity had been removed but still points to a non-existent link, we'll get
-                                 * an error.  This information is still saved.  This is an error on the activity
-                                 * level and not an overall process error so just continue scraping activities. */
-                                console.error("Error code " + error + " for \"" + name + "\": " + activityUrl);
-                                orphanedActivities++;
+                                // Resolve this promise (end of this promise thread)
+                                activityListScrapePromise.reject(error.toString());
 
-                                // Was waiting to include leader name in keywords but that information was not scraped
-                                activityObj.set("keywords", keywords);  // Keywords for search
-
-                                // Save activity object
-                                activityObj.save(null, {
-                                    success: function(activityObjSave) {
-                                        // Move on to the next activity on this page
-                                        if (i < 49) {
-                                            scrapeNextActivity();
-                                        }
-                                        // Save represents the 50th activity on this page
-                                        else {  // Scraping of this page complete
-                                            // Resolve this promise (end of this promise thread)
-                                            activityListScrapePromise.resolve("Page " + pageNumber + " complete!");
-                                        }
-                                    },
-                                    error: function(activityObjSave, error) {  // Error saving activity to Parse class
-                                        // Reject this promise and send error
-                                        activityListScrapePromise.reject("Failed to create new object.  Error code "
-                                                    + error.code + ": " + error.message);
-                                    }
-                                });
+                                i = 50;  // Force out of the "loop" early
                             });
                         }
                     }
@@ -642,7 +867,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                     results[i].set(filter, true);  // Set this filter criteria value to true
                 }
 
-                console.log(filter + " was set true for " + results.length + " activities.");
+                trueCounter = trueCounter + results.length;
                 return Parse.Object.saveAll(results);  // Save all results
             }
             else {  // No activities found so no updates needed
@@ -672,7 +897,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                     results[i].set(filter, false);  // Set this filter criteria value to false
                 }
 
-                console.log(filter + " was set false for " + results.length + " activities.");
+                falseCounter = falseCounter + results.length;
                 return Parse.Object.saveAll(results);  // Save all results
             }
             else {  // No activities found so no updates needed
