@@ -857,7 +857,9 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         /* Note that the time below is adjusting a day back since an activity date is saved at the beginning of
          * its day (i.e. at midnight).  The time is further adjusted to account for the Parse server being set
          * at UTC, while all activities are in PST (-7). */
-        query.greaterThan("activityStartDate", new Date(new Date().getTime() - ((24 + 7) * 60 * 60 * 1000)));
+        if (dateRange === "") {  // Only set this restriction if looking at future activities
+            query.greaterThan("activityStartDate", new Date(new Date().getTime() - ((24 + 7) * 60 * 60 * 1000)));
+        }
 
         // ... where the filter criteria value is currently not true (i.e. false or undefined)
         query.notEqualTo(filter, true);
@@ -893,7 +895,9 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             /* Note that the time below is adjusting a day back since an activity date is saved at the beginning of
              * its day (i.e. at midnight).  The time is further adjusted to account for the Parse server being set
              * at UTC, while all activities are in PST (-7). */
-            query.greaterThan("activityStartDate", new Date(new Date().getTime() - ((24 + 7) * 60 * 60 * 1000)));
+            if (dateRange === "") {  // Only set this restriction if looking at future activities
+                query.greaterThan("activityStartDate", new Date(new Date().getTime() - ((24 + 7) * 60 * 60 * 1000)));
+            }
 
             // ... where the filter criteria value is currently true
             query.equalTo(filter, true);
