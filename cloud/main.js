@@ -15,9 +15,9 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     var falseCounter = 0;  // Keeps track of the number of filter criteria set to false
     var totalActivities;
 
-    //var dateRange = "&c6:list=1970-01-01&c6:list=9999-12-31";  // All activities
+//    var dateRange = "&c6:list=1970-01-01&c6:list=9999-12-31";  // All activities
     var dateRange = "";  // All activities in the future (including today)
-    //var dateRange = "&c6:list=2014-06-01&c6:list=2014-08-01";  // Custom range
+//    var dateRange = "&c6:list=2014-06-01&c6:list=2014-08-01";  // Custom range
 
     // Filter category variables
     var filterCriteria = [
@@ -852,6 +852,13 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         query = new Parse.Query(ActivityClass);  // Create new query
         // ... where the object corresponds to one of the filtered activity URLs
         query.containedIn("activityUrl", filteredURLs[filterCriteriaIndex]);
+
+        // ... where the activity start date occurs sometime in the future (includes current day)
+        /* Note that the time below is adjusting a day back since an activity date is saved at the beginning of
+         * its day (i.e. at midnight).  The time is further adjusted to account for the Parse server being set
+         * at UTC, while all activities are in PST (-7). */
+        query.greaterThan("activityStartDate", new Date(new Date().getTime() - ((24 + 7) * 60 * 60 * 1000)));
+
         // ... where the filter criteria value is currently not true (i.e. false or undefined)
         query.notEqualTo(filter, true);
         /* ... give us only this filter criteria field of interest (do not send other fields to minimize resource
@@ -881,6 +888,13 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             query = new Parse.Query(ActivityClass);  // Create new query
             // ... where the object does not correspond to one of the filtered activity URLs
             query.notContainedIn("activityUrl", filteredURLs[filterCriteriaIndex]);
+
+            // ... where the activity start date occurs sometime in the future (includes current day)
+            /* Note that the time below is adjusting a day back since an activity date is saved at the beginning of
+             * its day (i.e. at midnight).  The time is further adjusted to account for the Parse server being set
+             * at UTC, while all activities are in PST (-7). */
+            query.greaterThan("activityStartDate", new Date(new Date().getTime() - ((24 + 7) * 60 * 60 * 1000)));
+
             // ... where the filter criteria value is currently true
             query.equalTo(filter, true);
             /* ... give us only this filter criteria field of interest (do not send other fields to minimize resource
