@@ -13,7 +13,8 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     var updatedActivities = 0;  // Counter for updated existing activities
     var trueCounter = 0;  // Keeps track of the number of filter criteria set to true
     var falseCounter = 0;  // Keeps track of the number of filter criteria set to false
-    var totalActivities;
+    var totalActivities = 0;  // Keeps track of all activities reviewed for changed content (excluded filter criteria)
+    var totalFilteredActivities = 0;  // Keeps track of all activities reviewed for changed filter criteria
 
 //    var dateRange = "&c6:list=1970-01-01&c6:list=9999-12-31";  // All activities
     var dateRange = "";  // All activities in the future (including today)
@@ -141,7 +142,8 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     var onCompletionListener = new Parse.Promise();  // Create a trivial resolved promise as a base case
     onCompletionListener.then(function() {  // Overall job was successful
         status.success("A total of " + totalActivities + " activities were reviewed: " + newActivities +
-                " activities added and " + updatedActivities + " activities updated.  " + trueCounter +
+                " activities added and " + updatedActivities + " activities updated.  A total of " +
+                totalFilteredActivities + " filter criteria were reviewed: " + trueCounter +
                 " filter criteria set to true and " + falseCounter + " filter criteria set to false.  " +
                 orphanedActivities + " activities have been orphaned (i.e. no longer have working web pages).");
     }, function(error) {  // Overall job failed
@@ -311,7 +313,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
                         try {
                             // Webpage Address: HREF at /html/body/div[i]/div[2]/h3/a
-                            activityUrl = doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).attributes().HREF;
+                            activityUrl = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).H3.at(0).A.at(0).attributes().HREF;
                         }
                         catch (err) {
                             /* Reached the end of activities for this page.  There are less than 50 activities on
@@ -351,36 +353,36 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                     }
 
                                     // Name: /html/body/div[i]/div[2]/h3/a
-                                    name = doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).text();
+                                    name = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).H3.at(0).A.at(0).text();
                                     if (name !== activityObj.get("name")) {
                                         activityObj.set("name", name);
                                     }
 
                                     // Type: /html/body/div[i]/div[2]/div[1]
-                                    type = doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(0).text();
+                                    type = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).DIV.at(0).text();
                                     if (type !== activityObj.get("type")) {
                                         activityObj.set("type", type);
                                     }
 
                                     // Picture: /html/body/div[i]/a/img
-                                    imageURL = doc.HTML.BODY.DIV.at(i).A.at(0).IMG.at(0).attributes().SRC;
+                                    imageURL = doc.HTML.BODY.DIV.at(i + 1).A.at(0).IMG.at(0).attributes().SRC;
                                     if (imageURL !== activityObj.get("imgUrl")) {
                                         activityObj.set("imgUrl", imageURL);
                                     }
 
                                     // Branch: /html/body/div[i]/div[1]/div[2]
-                                    branch = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(1).text();
+                                    branch = doc.HTML.BODY.DIV.at(i + 1).DIV.at(0).DIV.at(1).text();
                                     if (branch !== activityObj.get("branch")) {
                                         activityObj.set("branch", branch);
                                     }
 
                                     /* Availability - Participant: /html/body/div[i]/div[1]/div[1]/span/strong or
                                      /html/body/div[i]/div[1]/div[1]/span[1]/strong */
-                                    availabilityParticipant = Number(doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).SPAN
-                                                .at(0).STRONG.at(0).text());
+                                    availabilityParticipant = Number(doc.HTML.BODY.DIV.at(i + 1).DIV.at(0).DIV.at(0)
+                                            .SPAN.at(0).STRONG.at(0).text());
 
                                     // Get the description text that comes after this number
-                                    desc = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).SPAN.at(0).text();
+                                    desc = doc.HTML.BODY.DIV.at(i + 1).DIV.at(0).DIV.at(0).SPAN.at(0).text();
 
                                     // Check to see if this number represents the waitlist
                                     if (desc.toLowerCase().indexOf("waitlist") !== -1) {
@@ -398,12 +400,12 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                      * corresponds to the availability for participants.  This is not correct, so we first need
                                      * to check if the value returned applies to "participant" or "leader". */
                                     // Get the description text that comes after the expected leader availability
-                                    desc = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).SPAN.at(1).text();
+                                    desc = doc.HTML.BODY.DIV.at(i + 1).DIV.at(0).DIV.at(0).SPAN.at(1).text();
 
                                     // Check to see if this number represents the leader availability
                                     if (desc.toLowerCase().indexOf("leader") !== -1) {
                                         // This does represent leader availability, so retrieve the number
-                                        availabilityLeader = Number(doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).SPAN
+                                        availabilityLeader = Number(doc.HTML.BODY.DIV.at(i + 1).DIV.at(0).DIV.at(0).SPAN
                                                     .at(1).STRONG.at(0).text());
 
                                         // Check to see if this number represents the waitlist
@@ -419,7 +421,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                     }
 
                                     // Difficulty: /html/body/div[i]/div[2]/div[2]
-                                    difficulty = doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(1).text();
+                                    difficulty = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).DIV.at(1).text();
 
                                     // Find out if the difficulty rating for this activity is missing
                                     if (difficulty.toLowerCase().indexOf("difficulty") !== -1) {
@@ -428,10 +430,10 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                         }
 
                                         // Activity date(s): /html/body/div[i]/div[2]/div[3]
-                                        activityDate = doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(2).text();
+                                        activityDate = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).DIV.at(2).text();
 
                                         // Prerequisites: /html/body/div[i]/div[2]/div[4]
-                                        prereq = doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(3).text();
+                                        prereq = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).DIV.at(3).text();
                                         if (prereq !== activityObj.get("prereq")) {
                                             activityObj.set("prereq", prereq);
                                         }
@@ -448,7 +450,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                         activityDate = difficulty;  // Use the expected Difficulty value
 
                                         // Prerequisites: /html/body/div[i]/div[2]/div[3]
-                                        prereq = doc.HTML.BODY.DIV.at(i).DIV.at(1).DIV.at(2).text();
+                                        prereq = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).DIV.at(2).text();
                                         if (prereq !== activityObj.get("prereq")) {
                                             activityObj.set("prereq", prereq);
                                         }
@@ -489,7 +491,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                     }
 
                                     // Registration information: /html/body/div[i]/div[1]/div[1]/div
-                                    regInfo = doc.HTML.BODY.DIV.at(i).DIV.at(0).DIV.at(0).DIV.at(0).text()
+                                    regInfo = doc.HTML.BODY.DIV.at(i + 1).DIV.at(0).DIV.at(0).DIV.at(0).text()
                                                 .replace("\n", "").trim();
 
                                     // Check to make sure activity has not been canceled
@@ -802,11 +804,29 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         }).then(function(httpResponse) {
             var html = httpResponse.text;
             var url;
+            var pageListing;
+            var multiplePages = true;
 
             // Use xmlreader to parse HTML code for all entries and put activity URL into array
             xmlreader.read(html, function (err, doc) {
                 // There are 50 items on each webpage (except for the last page).  All items start at 0.
                 for (var i = 0; i < 50; i++) {
+                    // See if there is a page listing at the top of the page
+                    try {
+                        pageListing = doc.HTML.BODY.DIV.at(0).attributes().CLASS;
+
+                        // If the above value is listingBar then there are multiple pages
+                        if (pageListing.toLowerCase().trim() === "listingbar") {
+                            multiplePages = true;
+                        }
+                        else {
+                            multiplePages = false;
+                        }
+                    }
+                    catch (err) {  // If there is an error assume it is a single page
+                        multiplePages = false;
+                    }
+
                     try {
                         /* There is a special condition where xmlreader.js and sax.js do not function correctly.  For
                          * the case where there is one result on the webpage, the xmlreader command for i > 1 returns
@@ -814,7 +834,12 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                          * URLs must be unique, catch this bug by comparing the URL to the previously scraped URL and
                          * see if it is the same. */
                         // Webpage Address: HREF at /html/body/div[i]/div[2]/h3/a
-                        url = doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).attributes().HREF;
+                        if (multiplePages) {
+                            url = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).H3.at(0).A.at(0).attributes().HREF;
+                        }
+                        else {
+                            url = doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).attributes().HREF;
+                        }
 
                         // Check for special condition as described above
                         if (i === 1 && url === filteredURLs[filterCriteriaIndex][0]) {
@@ -822,6 +847,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                 ") URLs have been extracted!");
                         }
                         else {  // Not the special condition
+                            totalFilteredActivities = totalFilteredActivities + 1;  // Increment counter
                             filteredURLs[filterCriteriaIndex].push(url);
                         }
                     }
