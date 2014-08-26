@@ -16,8 +16,13 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     var totalActivities = 0;  // Keeps track of all activities reviewed for changed content (excluded filter criteria)
     var totalFilteredActivities = 0;  // Keeps track of all activities reviewed for changed filter criteria
 
+    /* Tells the date used in the Parse query if all activities should be considered (must correspond to the dateRange
+     * variable below) */
+//    var dateAll = true;
 //    var dateRange = "&c6:list=1970-01-01&c6:list=9999-12-31";  // All activities
-    var dateRange = "";  // All activities in the future (including today)
+    var dateAll = false;
+    var dateRange = "&c6:list=" + new Date().getFullYear() + "-" + (new Date().getMonth() + 1) + "-" +
+            new Date().getDate() +"&c6:list=9999-12-31";  // All activities in the future (including today in UTC)
 //    var dateRange = "&c6:list=2014-06-01&c6:list=2014-08-01";  // Custom range
 
     // Filter category variables
@@ -883,7 +888,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         /* Note that the time below is adjusting a day back since an activity date is saved at the beginning of
          * its day (i.e. at midnight).  The time is further adjusted to account for the Parse server being set
          * at UTC, while all activities are in PST (-7). */
-        if (dateRange === "") {  // Only set this restriction if looking at future activities
+        if (!dateAll) {  // Only set this restriction if looking at future activities
             query.greaterThan("activityStartDate", new Date(new Date().getTime() - ((24 + 7) * 60 * 60 * 1000)));
         }
 
@@ -921,7 +926,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             /* Note that the time below is adjusting a day back since an activity date is saved at the beginning of
              * its day (i.e. at midnight).  The time is further adjusted to account for the Parse server being set
              * at UTC, while all activities are in PST (-7). */
-            if (dateRange === "") {  // Only set this restriction if looking at future activities
+            if (!dateAll) {  // Only set this restriction if looking at future activities
                 query.greaterThan("activityStartDate", new Date(new Date().getTime() - ((24 + 7) * 60 * 60 * 1000)));
             }
 
