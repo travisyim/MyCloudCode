@@ -6,7 +6,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
      * xmlreader.js for HTML) */
     var xmlreader = require("cloud/xmlreader.js");
 
-    var ActivityClass = Parse.Object.extend("ActivityAll");  // Make connection to 'Activity' class
+    var ActivityClass = Parse.Object.extend("Activity");  // Make connection to 'Activity' class
     var promises = [];  // This variable will hold all of the webpage scraping activity promises
     var orphanedActivities = 0;  // This will keep track of how many activities have lost their way (i.e. webpage)
     var newActivities = 0;  // Counter for new activities added
@@ -244,6 +244,19 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
         keywords = _.uniq(keywords);  // Do not allow duplicate keywords
         return keywords;  // Return array of unique qualified keywords
+    }
+
+    /* This function compares two sets of keywords and determines if the first set is contained within the second.  Both
+     * sets of keywords are in lower case. The number of keywords matched is returned. */
+    function compareKeywords(curKeywords, prevKeywords) {
+        var _ = require("underscore");  // Require underscore.js
+
+        // Filter which current keywords are contained within the previous keywords
+        var commonKeywords = _.filter(curKeywords, function(w) {
+            return _.contains(prevKeywords, w);
+        });
+
+        return commonKeywords.length;  // Return number of common keywords
     }
 
     // This function scrapes each activity webpage and extracts its activities
@@ -687,19 +700,10 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                                         // Get the previous keywords
                                         previousKeywords = activityObj.get("keywords");
 
-                                        // Compare the string array lengths
-                                        if (keywords.length === previousKeywords.length) {  // Same length
-                                            /* Go through the words and make compare the two sets (will be in the same
-                                             * order if they're the same) */
-                                            for (var j = 0; j < keywords.length; j++) {
-                                                if (keywords[j] !== previousKeywords[j]) {
-                                                    activityObj.set("keywords", keywords);  // Keywords for search
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        else {  // Different length
-                                            activityObj.set("keywords", keywords);  // Keywords for search
+                                        // Determine if all keywords are contained within previous keywords
+                                        if (keywords.length !== compareKeywords(keywords, previousKeywords)) {
+                                            // Keywords are not all contained
+                                            activityObj.set("keywords", keywords);  // Assign new keywords
                                         }
                                     }
                                     else {  // Not previously defined
