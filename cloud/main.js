@@ -177,7 +177,10 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         // Send request to get the first activity webpage
         return Parse.Cloud.httpRequest({
             // URL below points to all activities (not just the ones open for registration) and starts at the item 1
-            url: activityUrl
+            url: activityUrl,
+            headers: {
+                'User-Agent' : "Mountaineers App Back-End"
+            }
         }).then(function(httpResponse) {
             html = httpResponse.text;  // Make a copy of the webpage HTML text
 
@@ -268,7 +271,10 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         // Send request to get the activity webpage
         Parse.Cloud.httpRequest({
             url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=" +
-                    (pageNumber - 1) * 50 + dateRange
+                    (pageNumber - 1) * 50 + dateRange,
+            headers: {
+                'User-Agent' : "Mountaineers App Back-End"
+            }
         }).then(function(httpResponse) {
             var html = httpResponse.text;
 
@@ -778,7 +784,10 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     function getTotalPages(criteria, baseURL, position) {
         // Request the first page of results to determine total number of pages (based on links at bottom of page)
         return Parse.Cloud.httpRequest({
-            url: baseURL + "0" + dateRange
+            url: baseURL + "0" + dateRange,
+            headers: {
+                'User-Agent' : "Mountaineers App Back-End"
+            }
         }).then(function (httpResponse) {
             var html = httpResponse.text;
 
@@ -809,7 +818,10 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     function getFilteredURLs(filterCriteriaIndex, baseURL, pageNumber) {
         // Send request to get the activity webpage
         return Parse.Cloud.httpRequest({
-            url: baseURL + (pageNumber - 1) * 50 + dateRange
+            url: baseURL + (pageNumber - 1) * 50 + dateRange,
+            headers: {
+                'User-Agent' : "Mountaineers App Back-End"
+            }
         }).then(function(httpResponse) {
             var html = httpResponse.text;
             var url;
@@ -980,7 +992,10 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
     // Request the first page of results to determine total number of pages (based on links at bottom of page)
     Parse.Cloud.httpRequest({
-        url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=0" + dateRange
+        url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=0" + dateRange,
+        headers: {
+            'User-Agent' : "Mountaineers App Back-End"
+        }
     }).then(function(httpResponse) {
         var html = httpResponse.text;
 
