@@ -1,983 +1,986 @@
-/* The following code uses xmlreader.js, which in turn uses sax.js, to make a connection to the Moutaineers website and
- * obtains the all activity webpages (or just the activities occuring in the future) */
+// The following code uses jquery-2.1.1.js, to process (i.e. parse) the JSON data
 
 Parse.Cloud.job("UpdateActivities", function (request, status) {
-    /* xmlreader is the code used to parse HTML (code can parse both HTML and XML but strict must be set to false in
-     * xmlreader.js for HTML) */
-    var xmlreader = require("cloud/xmlreader.js");
+    // Constant declaration for all things JSON related (i.e. attribues listed in Mountaineers' JSON feed)
+    var JSON_CONST = {
+        KEY_ACTIVITY_ID: "id",
+        KEY_ACTIVITY_TITLE: "title",
+        KEY_ACTIVITY_TYPE: "activity_type",
+        KEY_TYPE_ADVENTURE_CLUB: "Adventure Club",
+        //KEY_TYPE_AVALANCHE_SAFETY: "Avalanche Safety",
+        KEY_TYPE_BACKPACKING: "Backpacking",
+        KEY_TYPE_CLIMBING: "Climbing",
+        KEY_TYPE_DAY_HIKING: "Day Hiking",
+        KEY_TYPE_EXPLORERS: "Explorers",
+        KEY_TYPE_EXPLORING_NATURE: "Exploring Nature",
+        //KEY_TYPE_FIRST_AID: "FirstAid",
+        KEY_TYPE_GLOBAL_ADVENTURES: "Global Adventures",
+        KEY_TYPE_MOUNTAIN_WORKSHOP: "Mountain Workshop",
+        KEY_TYPE_NAVIGATION: "Navigation",
+        //KEY_TYPE_OUTDOOR_LEADERSHIP: "Outdoor Leadership",
+        KEY_TYPE_PHOTOGRAPHY: "Photography",
+        KEY_TYPE_SAILING: "Sailing",
+        KEY_TYPE_SCRAMBLING: "Scrambling",
+        KEY_TYPE_SEA_KAYAKING: "Sea Kayaking",
+        KEY_TYPE_SKIING_SNOWBOARDING: "Skiing/Snowboarding",
+        KEY_TYPE_SNOWSHOEING: "Snowshoeing",
+        //KEY_TYPE_STAND_UP_PADDLING: "Stand Up Paddling",
+        KEY_TYPE_STEWARDSHIP: "Stewardship",
+        KEY_TYPE_TRAIL_RUNNING: "Trail Running",
+        KEY_TYPE_URBAN_ADVENTURE: "Urban Adventure",
+        KEY_TYPE_YOUTH: "Youth",
+        KEY_ACTIVITY_CREATION_DATE: "created",
+        KEY_ACTIVITY_MODIFICATION_DATE: "modified",
+        KEY_ACTIVITY_START_DATE: "start",
+        KEY_ACTIVITY_END_DATE: "end",
+        KEY_ACTIVITY_URL: "url",
+        KEY_AUDIENCE: "audience",
+        KEY_AUDIENCE_ADULTS: "Adults",
+        KEY_AUDIENCE_FAMILIES: "Families",
+        KEY_AUDIENCE_RETIRED_ROVERS: "Retired Rovers",
+        KEY_AUDIENCE_SINGLES: "Singles",
+        KEY_AUDIENCE_20_30_SOMETHINGS: "20-30 Somethings",
+        KEY_AUDIENCE_YOUTH: "Youth",
+        KEY_AVAILABILITY_LEADER: "leader_availability",
+        KEY_AVAILABILITY_PARTICIPANT: "participant_availability",
+        KEY_BRANCH: "branch",
+        KEY_BRANCH_THE_MOUNTAINEERS: "The Mountaineers",
+        KEY_BRANCH_BELLINGHAM: "Bellingham",
+        KEY_BRANCH_EVERETT: "Everett",
+        KEY_BRANCH_FOOTHILLS: "Foothills",
+        KEY_BRANCH_KITSAP: "Kitsap",
+        KEY_BRANCH_OLYMPIA: "Olympia",
+        KEY_BRANCH_OUTDOOR_CENTERS: "Outdoor Centers",
+        KEY_BRANCH_SEATTLE: "Seattle",
+        KEY_BRANCH_TACOMA: "Tacoma",
+        KEY_CATEGORY_CLIMBING: "climbing_category",
+        KEY_CLIMBING_BASIC_ALPINE: "Basic Alpine",
+        KEY_CLIMBING_INTERMEDIATE_ALPINE: "Intermediate Alpine",
+        //KEY_CLIMBING_BOULDER: "Boulder",
+        KEY_CLIMBING_AID_CLIMB: "Aid Climb",
+        KEY_CLIMBING_ROCK_CLIMB: "Rock Climb",
+        //KEY_CLIMBING_WATER_ICE: "Water Ice",
+        KEY_CATEGORY_SKIING: "skiing_category",
+        KEY_SKIING_CROSS_COUNTRY: "Cross-country",
+        KEY_SKIING_BACKCOUNTRY: "Backcountry",
+        KEY_SKIING_GLACIER: "Glacier",
+        KEY_CATEGORY_SNOWSHOEING: "snowshoeing_category",
+        KEY_SNOWSHOEING_BEGINNER: "Beginner",
+        KEY_SNOWSHOEING_BASIC: "Basic",
+        KEY_SNOWSHOEING_INTERMEDIATE: "Intermediate",
+        KEY_DIFFICULTY: "difficulty",
+        KEY_END_LOCATION: "geo_end",
+        KEY_FEE_GUEST: "member_fee",
+        KEY_FEE_MEMBER: "guest_fee",
+        KEY_IMAGE_URL: "image",
+        KEY_LEADERS: "leaders",
+        KEY_LEADER_RATING: "leader_rating",
+        KEY_LEADER_FOR_BEGINNERS: "For Beginners (Getting Started Series)",
+        KEY_LEADER_EASY: "Easy",
+        KEY_LEADER_MODERATE: "Moderate",
+        KEY_LEADER_CHALLENGING: "Challenging",
+        KEY_NAME: "name",
+        KEY_PREREQUISITES: "prerequisites",
+        KEY_QUALIFIED_YOUTH_LEAD: "qualified_youth_leader",
+        KEY_REGISTRATION_OPEN_DATE: "registration_start",
+        KEY_REGISTRATION_CLOSE_DATE: "registration_end",
+        KEY_REGISTRATION_CANCELED: "status",
+        KEY_ROLE: "role",
+        KEY_START_LOCATION: "geo_start"
+    };
 
-    var ActivityClass = Parse.Object.extend("Activity");  // Make connection to 'Activity' class
-    var promises = [];  // This variable will hold all of the webpage scraping activity promises
+    // Constant declaration for all things Parse related (i.e. Parse database field names)
+    var PARSE_CONST = {
+        // Classes
+        CLASS_ACTIVITY: "Test",
+
+        // Trip Information
+        KEY_ACTIVITY_ID: "activityId",
+        KEY_ACTIVITY_TITLE: "title",
+        KEY_ACTIVITY_TYPE: "type",
+        KEY_ACTIVITY_START_DATE: "activityStartDate",
+        KEY_ACTIVITY_END_DATE: "activityEndDate",
+        KEY_ACTIVITY_URL: "activityUrl",
+        KEY_AVAILABILITY_LEADER: "availabilityLeader",
+        KEY_AVAILABILITY_PARTICIPANT: "availabilityParticipant",
+        KEY_BRANCH: "branch",
+        KEY_DIFFICULTY: "difficulty",
+        KEY_END_LATITUDE: "endLat",
+        KEY_END_LONGITUDE: "endLong",
+        KEY_FEE_GUEST: "feeGuest",
+        KEY_FEE_MEMBER: "feeMember",
+        KEY_IMAGE_URL: "imgUrl",
+        KEY_KEYWORDS: "keywords",
+        KEY_LEADER_NAME: "leaderName",
+        KEY_LEADER_ROLE: "leaderRole",
+        KEY_PREREQUISITES: "prereq",
+        KEY_QUALIFIED_YOUTH_LEAD: "isQYL",
+        KEY_REGISTRATION_OPEN_TIME: "registrationOpenDate",
+        KEY_REGISTRATION_CLOSE_TIME: "registrationCloseDate",
+        KEY_REGISTRATION_CANCELED: "isCanceled",
+        KEY_START_LATITUDE: "startLat",
+        KEY_START_LONGITUDE: "startLong",
+        KEY_STATUS: "status",
+
+        // Filter Categories
+        KEY_ADVENTURE_CLUB: "isAdventureClub",
+        //KEY_AVALANCHE_SAFETY: "isAvalancheSafety",
+        KEY_BACKPACKING: "isBackpacking",
+        KEY_CLIMBING: "isClimbing",
+        KEY_DAY_HIKING: "isDayHiking",
+        KEY_EXPLORERS: "isExplorers",
+        KEY_EXPLORING_NATURE: "isExploringNature",
+        //KEY_FIRST_AID: "isFirstAid",
+        KEY_GLOBAL_ADVENTURES: "isGlobalAdventures",
+        KEY_MOUNTAIN_WORKSHOP: "isMountainWorkshop",
+        KEY_NAVIGATION: "isNavigation",
+        //KEY_OUTDOOR_LEADERSHIP: "isOutdoorLeadership",
+        KEY_PHOTOGRAPHY: "isPhotography",
+        KEY_SAILING: "isSailing",
+        KEY_SCRAMBLING: "isScrambling",
+        KEY_SEA_KAYAKING: "isSeaKayaking",
+        KEY_SKIING_SNOWBOARDING: "isSkiingSnowboarding",
+        KEY_SNOWSHOEING: "isSnowshoeing",
+        //KEY_STAND_UP_PADDLING: "isStandUpPaddling",
+        KEY_STEWARDSHIP: "isStewardship",
+        KEY_TRAIL_RUNNING: "isTrailRunning",
+        KEY_URBAN_ADVENTURE: "isUrbanAdventure",
+        KEY_YOUTH_TYPE: "isYouthType",
+        KEY_FOR_BEGINNERS: "isForBeginners",
+        KEY_EASY: "isEasy",
+        KEY_MODERATE: "isModerate",
+        KEY_CHALLENGING: "isChallenging",
+        KEY_ADULTS: "isAdults",
+        KEY_FAMILIES: "isFamilies",
+        KEY_RETIRED_ROVERS: "isRetiredRovers",
+        KEY_SINGLES: "isSingles",
+        KEY_20_30_SOMETHINGS: "is2030Somethings",
+        KEY_YOUTH: "isYouth",
+        KEY_THE_MOUNTAINEERS: "isTheMountaineers",
+        KEY_BELLINGHAM: "isBellingham",
+        KEY_EVERETT: "isEverett",
+        KEY_FOOTHILLS: "isFoothills",
+        KEY_KITSAP: "isKitsap",
+        KEY_OLYMPIA: "isOlympia",
+        KEY_OUTDOOR_CENTERS: "isOutdoorCenters",
+        KEY_SEATTLE: "isSeattle",
+        KEY_TACOMA: "isTacoma",
+        KEY_BASIC_ALPINE: "isBasicAlpine",
+        KEY_INTERMEDIATE_ALPINE: "isIntermediateAlpine",
+        //KEY_BOULDER: "isBoulder",
+        KEY_AID_CLIMB: "isAidClimb",
+        KEY_ROCK_CLIMB: "isRockClimb",
+        //KEY_WATER_ICE: "isWaterIce",
+        KEY_CROSS_COUNTRY: "isCrosscountry",
+        KEY_BACKCOUNTRY: "isBackcountry",
+        KEY_GLACIER: "isGlacier",
+        KEY_BEGINNER: "isBeginner",
+        KEY_BASIC: "isBasic",
+        KEY_INTERMEDIATE: "isIntermediate"
+    };
+
+    function activityObject(){
+        this.id = null;
+        this.title = null;
+        this.type = null;
+        this.created = null;
+        this.modified = null;
+        this.start = null;
+        this.end = null;
+        this.url = null;
+        this.audience = null;
+        this.leaderAvail = null;
+        this.participantAvail = null;
+        this.branch = null;
+        this.climbingCat = null;
+        this.skiingCat = null;
+        this.snowshoeingCat = null;
+        this.difficulty = null;
+        this.endLocation = null;
+        this.guestFee = null;
+        this.memberFee = null;
+        this.imageUrl = null;
+        this.leaders = null;
+        this.leaderRating = null;
+        this.leaderName = [];
+        this.prerequisites = null;
+        this.leaderQYL = [];
+        this.registrationStart = null;
+        this.registrationEnd = null;
+        this.status = null;
+        this.leaderRole = [];
+        this.startLocation = null;
+        this.isAdventureClub = false;
+        //this.isAvalancheSafety = false;
+        this.isBackpacking = false;
+        this.isClimbing = false;
+        this.isDayHiking = false;
+        this.isExplorers = false;
+        this.isExploringNature = false;
+        //this.isFirstAid = false;
+        this.isGlobalAdventures = false;
+        this.isMountainWorkshop = false;
+        this.isNavigation = false;
+        //this.isOutdoorLeadership = false;
+        this.isPhotography = false;
+        this.isSailing = false;
+        this.isScrambling = false;
+        this.isSeaKayaking = false;
+        this.isSkiingSnowboarding = false;
+        this.isSnowshoeing = false;
+        //this.isStandUpPaddling = false;
+        this.isStewardship = false;
+        this.isTrailRunning = false;
+        this.isUrbanAdventure = false;
+        this.isYouthType = false;
+        this.isForBeginners = false;
+        this.isEasy = false;
+        this.isModerate = false;
+        this.isChallenging = false;
+        this.isAdults = false;
+        this.isFamilies = false;
+        this.isRetiredRovers = false;
+        this.isSingles = false;
+        this.is2030Somethings = false;
+        this.isYouth = false;
+        this.isTheMountaineers = false;
+        this.isBellingham = false;
+        this.isEverett = false;
+        this.isFoothills = false;
+        this.isKitsap = false;
+        this.isOlympia = false;
+        this.isOutdoorCenters = false;
+        this.isSeattle = false;
+        this.isTacoma = false;
+        this.isBasicAlpine = false;
+        this.isIntermediateAlpine = false;
+        //this.isBoulder = false;
+        this.isAidClimb = false;
+        this.isRockClimb = false;
+        //this.isWaterIce = false;
+        this.isCrosscountry = false;
+        this.isBackcountry = false;
+        this.isGlacier = false;
+        this.isBeginner = false;
+        this.isBasic = false;
+        this.isIntermediate = false;
+    }
+
+    var ActivityClass = Parse.Object.extend(PARSE_CONST.CLASS_ACTIVITY);  // Make connection to Activity class
+
+    var promises = [];  // This variable will hold all of the activity scraping promises
+
     var orphanedActivities = 0;  // This will keep track of how many activities have lost their way (i.e. webpage)
     var newActivities = 0;  // Counter for new activities added
     var updatedActivities = 0;  // Counter for updated existing activities
-    var trueCounter = 0;  // Keeps track of the number of filter criteria set to true
-    var falseCounter = 0;  // Keeps track of the number of filter criteria set to false
     var totalActivities = 0;  // Keeps track of all activities reviewed for changed content (excluded filter criteria)
-    var totalFilteredActivities = 0;  // Keeps track of all activities reviewed for changed filter criteria
-
-    /* Tells the date used in the Parse query if all activities should be considered (must correspond to the dateRange
-     * variable below) */
-//    var dateAll = true;
-//    var dateRange = "&c6:list=1970-01-01&c6:list=9999-12-31";  // All activities
-    var dateAll = false;
-    var dateRange = "&c6:list=" + new Date().getFullYear() + "-" + (new Date().getMonth() + 1) + "-" +
-            new Date().getDate() +"&c6:list=9999-12-31";  // All activities in the future (including today in UTC)
-//    var dateRange = "&c6:list=2014-06-01&c6:list=2014-08-01";  // Custom range
-
-    // Filter category variables
-    var filterCriteria = [
-        "isAdventureClub",
-        "isAvalancheSafety",
-        "isBackpacking",
-        "isClimbing",
-        "isDayHiking",
-        "isExplorers",
-        "isExploringNature",
-        "isFirstAid",
-        "isGlobalAdventures",
-        "isMountainWorkshop",
-        "isNavigation",
-        "isOutdoorLeadership",
-        "isPhotography",
-        "isSailing",
-        "isScrambling",
-        "isSeaKayaking",
-        "isSkiingSnowboarding",
-        "isSnowshoeing",
-        "isStandUpPaddling",
-        "isStewardship",
-        "isTrailRunning",
-        "isUrbanAdventure",
-        "isYouthType",
-        "isForBeginners",
-        "isEasy",
-        "isModerate",
-        "isChallenging",
-        "isAdults",
-        "isFamilies",
-        "isRetiredRovers",
-        "isSingles",
-        "is2030Somethings",
-        "isYouth",
-        "isTheMountaineers",
-        "isBellingham",
-        "isEverett",
-        "isFoothills",
-        "isKitsap",
-        "isOlympia",
-        "isOutdoorCenters",
-        "isSeattle",
-        "isTacoma",
-        "isBasicAlpine",
-        "isIntermediateAlpine",
-        "isBoulder",
-        "isAidClimb",
-        "isRockClimb",
-        "isWaterIce",
-        "isCrosscountry",
-        "isBackcountry",
-        "isGlacier",
-        "isBeginner",
-        "isBasic",
-        "isIntermediate"
-    ];
-
-    var filterBaseUrl = [
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Adventure+Club&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Avalanche+Safety&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Backpacking&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Climbing&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Day+Hiking&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Explorers&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Exploring+Nature&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=First+Aid&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Global+Adventures&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Mountain+Workshop&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Navigation&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Outdoor+Leadership&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Photography&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Sailing&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Scrambling&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Sea+Kayaking&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Skiing/Snowboarding&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Snowshoeing&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Stand+Up+Paddling&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Stewardship&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Trail+Running&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Urban+Adventure&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c4=Youth&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c15=For+Beginners+(Getting+Started+Series)&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c15=Easy&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c15=Moderate&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c15=Challenging&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c5=Adults&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c5=Families&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c5=Retired+Rovers&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c5=Singles&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c5=20-30+Somethings&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c5=Youth&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=The+Mountaineers&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Bellingham&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Everett&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Foothills&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Kitsap&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Olympia&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Outdoor+Centers&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Seattle&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c8=Tacoma&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c7=Basic+Alpine&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c7=Intermediate+Alpine&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c7=Boulder&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c7=Aid+Climb&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c7=Rock+Climb&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c7=Water+Ice&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c9=Cross-country&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c9=Backcountry&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c9=Glacier&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c10=Beginner&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c10=Basic&b_start=",
-        "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?c10=Intermediate&b_start="
-    ];
-
-    var filterTotalPages = new Array(filterCriteria.length);
-    var filteredURLs = [];
 
     // Define listener to handle completion event
     var onCompletionListener = new Parse.Promise();  // Create a trivial resolved promise as a base case
     onCompletionListener.then(function() {  // Overall job was successful
         status.success("A total of " + totalActivities + " activities were reviewed: " + newActivities +
-                " activities added and " + updatedActivities + " activities updated.  A total of " +
-                totalFilteredActivities + " filter criteria were reviewed: " + trueCounter +
-                " filter criteria set to true and " + falseCounter + " filter criteria set to false.  " +
+                " activities added and " + updatedActivities + " activities updated.  " +
                 orphanedActivities + " activities have been orphaned (i.e. no longer have working web pages).");
     }, function(error) {  // Overall job failed
         status.error(error.toString());
     });
 
-    /* This function scrapes each individual activity webpage for its GPS coordinates
-     * Data is presented in the following format:
-     * <span class="latitude">46.8528857</span>
-     * <span class="longitude">-121.7603744</span> */
-    function scrapeAdditionalInfo(activityUrl) {
-        var html;
-        var additionalInfo = [];  // Array that holds GPS coordinates for each activity
-        // Represents the next HTML line after the leader name
-        var leaderApproxPosition = "Primary Leader";
-        var leaderStart = "<div>";  // Represents the end of the leader name
-        var leaderEnd = "</div>";  // Represents the end of the leader name
-        var gpsStart = /<span class="l/;  // Represents lines with either latitude or longitude
-        var gpsEnd = /<\/span>/;  // Represents end of GPS data
-        var gpsCoord = /(-|\d)/;  // Represents the start of GPS data (i.e. either a "-" or a number)
-        var startPosition;
-        var endPosition;
-        var approxPosition;
-        var tempStr;
-
-        // Send request to get the first activity webpage
-        return Parse.Cloud.httpRequest({
-            // URL below points to all activities (not just the ones open for registration) and starts at the item 1
-            url: activityUrl,
-            headers: {
-                'User-Agent' : "Mountaineers App Back-End"
-            }
-        }).then(function(httpResponse) {
-            html = httpResponse.text;  // Make a copy of the webpage HTML text
-
-            // Leader information
-            approxPosition = html.search(leaderApproxPosition);  // Find approximate location of the leader data
-            endPosition = html.lastIndexOf(leaderEnd, approxPosition);
-            startPosition = html.lastIndexOf(leaderStart, endPosition) + 5;
-            additionalInfo.push(html.substring(startPosition, endPosition));  // Leader name
-
-            // Qualified Youth Leader
-            tempStr = html.substr(approxPosition, 120);  // Examine the line after the "Primary Leader" designation
-            if (tempStr.search("Qualified Youth Leader") !== -1) {  // Look for Qualified Youth Leader designation
-                additionalInfo.push(true);  // Found
-            }
-            else {  // Not found
-                additionalInfo.push(false);
-            }
-
-            // GPS coordinates
-            for (var i = 0; i < 4; i++) {
-                // Scrape 2 sets of latitude and longitude data
-                startPosition = html.search(gpsStart);  // Find start of GPS coordinate data
-                // Truncate string to the beginning of our data of interest (i.e. <span class="l)
-                html = html.substr(startPosition);
-                html = html.substr(html.search(gpsCoord));  // Truncate to start of numbers
-                endPosition = html.search(gpsEnd);  // Find position marking the end of numbers (i.e. </span>)
-                additionalInfo.push(html.substr(0, endPosition));  // Add data to GPS coordinate array
-            }
-
-            // Return GPS coordinates
-            return Parse.Promise.as(additionalInfo);
-        }, function(httpResponse) {
-            // Return Parse error if error is encountered
-            return Parse.Promise.error(httpResponse.status);
-        });
-    }
-
-    /* This function assigns the activity keywords based on the provided field.  The second parameter is used to signal
-     * that the field is the activity name (special handling required to remove activity type in the name) */
-    function getKeywords(field, isActivityName) {
-        var _ = require("underscore");  // Require underscore.js
-
-        var toLowerCase = function(w) {
-            return w.toLowerCase();
-        };
-
-        var keywords = field;
-        var ignoreWords = ["the", "in", "and", "to", "of", "at", "for", "from", "a", "an", "s"];  // Words to ignore
-
-        // If this is the activity name field then drop the activity type that's always printed at the beginning
-        if (isActivityName) {
-            // Special condition would be for cross-country ski trips
-            keywords = keywords.replace(/^cross-country/gi, "");  // Remove the initial chunk that has the hyphen
-            keywords = keywords.substr(keywords.indexOf("-") + 1);  // Only keep the actual activity name
+    // attach the .equals method to Array's prototype to call it on any array
+    Array.prototype.equals = function (array) {
+        // if the other array is a falsy value, return
+        if (!array) {
+            return false;
         }
 
-        keywords = keywords.split(/\b/);  // Split word by borders
+        // compare lengths - can save a lot of time
+        if (this.length != array.length) {
+            return false;
+        }
 
-        // Filter out only lowercase words that do not match the ignoreWords
-        keywords = _.map(keywords, toLowerCase);
-        keywords = _.filter(keywords, function(w) {
-            return w.match(/^\w+$/) && ! _.contains(ignoreWords, w);
-        });
-
-        keywords = _.uniq(keywords);  // Do not allow duplicate keywords
-        return keywords;  // Return array of unique qualified keywords
-    }
-
-    /* This function compares two sets of keywords and determines if the first set is contained within the second.  Both
-     * sets of keywords are in lower case. The number of keywords matched is returned. */
-    function compareKeywords(curKeywords, prevKeywords) {
-        var _ = require("underscore");  // Require underscore.js
-
-        // Filter which current keywords are contained within the previous keywords
-        var commonKeywords = _.filter(curKeywords, function(w) {
-            return _.contains(prevKeywords, w);
-        });
-
-        return commonKeywords.length;  // Return number of common keywords
-    }
-
-    // This function scrapes each activity webpage and extracts its activities
-    function scrapeActivityList(pageNumber) {
-        /* This promise is monitored by overallScrapePromise and is added to the promises array.  There is an
-         * activityListScrapePromise promise for each of the webpages to be scraped. */
-        var activityListScrapePromise = new Parse.Promise();
-
-        // Send request to get the activity webpage
-        Parse.Cloud.httpRequest({
-            url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=" +
-                    (pageNumber - 1) * 50 + dateRange,
-            headers: {
-                'User-Agent' : "Mountaineers App Back-End"
+        for (var i = 0, l = this.length; i < l; i++) {
+            // Check if we have nested arrays
+            if (this[i] instanceof Array && array[i] instanceof Array) {
+                // recurse into the nested arrays
+                if (!this[i].equals(array[i]))
+                    return false;
             }
-        }).then(function(httpResponse) {
-            var html = httpResponse.text;
-
-            // Use xmlreader to parse HTML code for the first entry and put into the 'Activity' class
-            xmlreader.read(html, function (err, doc) {
-                var activityUrl;
-                var name;
-                var type;
-                var imageURL;
-                var branch;
-                var regInfo;
-                var regDate;
-                var availabilityParticipant;
-                var availabilityLeader;
-                var desc;
-                var difficulty;
-                var activityDate;
-                var prereq;
-                var startDate;
-                var endDate;
-                var leader;
-                var isQYL;
-                var keywords = [];
-                var previousKeywords = [];
-                var additionalInfoPromise;
-                var exists;
-                var keywordMatch;
-                var i = -1;
-
-                // There are 50 items on each webpage (except for the last page).  All items start at 0.
-                var scrapeNextActivity = function () {
-                    i++;
-
-                    if (i < 50) {
-                        // Represents the activity that will be saved/updated to/in the backend
-                        var activityObj = new ActivityClass();
-                        var query;
-
-                        // Clear the fields so that the information is not used incorrectly for the next activity
-                        activityUrl = null;
-                        name = null;
-                        type = null;
-                        imageURL = null;
-                        branch = null;
-                        regInfo = null;
-                        regDate = null;
-                        availabilityParticipant = null;
-                        availabilityLeader = null;
-                        desc = null;
-                        difficulty = null;
-                        activityDate = null;
-                        prereq = null;
-                        startDate = null;
-                        endDate = null;
-                        leader = null;
-                        keywords.length = 0;
-                        previousKeywords.length = 0;
-                        exists = false;
-                        keywordMatch = false;
-
-                        try {
-                            // Webpage Address: HREF at /html/body/div[i]/div[2]/h3/a
-                            activityUrl = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).H3.at(0).A.at(0).attributes().HREF;
-                        }
-                        catch (err) {
-                            /* Reached the end of activities for this page.  There are less than 50 activities on
-                             * this page (should only occur for last page) */
-                            totalActivities = (pageNumber - 1) * 50 + i;
-
-                            // Resolve this promise (end of this promise thread)
-                            activityListScrapePromise.resolve("Page " + pageNumber + " complete!");
-
-                            i = 50;  // Force out of the "loop" early
-                        }
-
-                        // If not at the end of the results
-                        if (activityUrl !== null) {
-                            // Check to see if this activity URL already exists
-                            query = new Parse.Query(ActivityClass);  // Create new query
-                            // ... where the object corresponds to one of the filtered activity URLs
-                            query.equalTo("activityUrl", activityUrl);
-
-                            // Launch query and retrieve object matching the specified query
-                            query.first().then(function (object) {  // Previous activity found
-                                // Check if a duplicate activity was found
-                                if (typeof object !== "undefined") {  // Duplicate found so use this existing object
-                                    // Use the existing activity object
-                                    activityObj = object;
-                                    exists = true;
-                                }
-
-                                return Parse.Promise.as();
-                            }, function (error) {  // Query was not able to run
-                                console.log("Not able to check if activity is duplicate");
-                                return Parse.Promise.error("Not able to check if activity is duplicate");
-                            }).then(function () {
-                                try {
-                                    if (activityUrl !== activityObj.get("activityUrl")) {
-                                        activityObj.set("activityUrl", activityUrl);
-                                    }
-
-                                    // Name: /html/body/div[i]/div[2]/h3/a
-                                    name = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).H3.at(0).A.at(0).text();
-                                    if (name !== activityObj.get("name")) {
-                                        activityObj.set("name", name);
-                                    }
-
-                                    // Type: /html/body/div[i]/div[2]/div[1]
-                                    type = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).DIV.at(0).text();
-                                    if (type !== activityObj.get("type")) {
-                                        activityObj.set("type", type);
-                                    }
-
-                                    // Picture: /html/body/div[i]/a/img
-                                    imageURL = doc.HTML.BODY.DIV.at(i + 1).A.at(0).IMG.at(0).attributes().SRC;
-                                    if (imageURL !== activityObj.get("imgUrl")) {
-                                        activityObj.set("imgUrl", imageURL);
-                                    }
-
-                                    // Branch: /html/body/div[i]/div[1]/div[2]
-                                    branch = doc.HTML.BODY.DIV.at(i + 1).DIV.at(0).DIV.at(1).text();
-                                    if (branch !== activityObj.get("branch")) {
-                                        activityObj.set("branch", branch);
-                                    }
-
-                                    /* Availability - Participant: /html/body/div[i]/div[1]/div[1]/span/strong or
-                                     /html/body/div[i]/div[1]/div[1]/span[1]/strong */
-                                    availabilityParticipant = Number(doc.HTML.BODY.DIV.at(i + 1).DIV.at(0).DIV.at(0)
-                                            .SPAN.at(0).STRONG.at(0).text());
-
-                                    // Get the description text that comes after this number
-                                    desc = doc.HTML.BODY.DIV.at(i + 1).DIV.at(0).DIV.at(0).SPAN.at(0).text();
-
-                                    // Check to see if this number represents the waitlist
-                                    if (desc.toLowerCase().indexOf("waitlist") !== -1) {
-                                        // Make the waitlist number negative
-                                        availabilityParticipant = -1 * availabilityParticipant;
-                                    }
-
-                                    if (availabilityParticipant !== activityObj.get("availabilityParticipant")) {
-                                        activityObj.set("availabilityParticipant", availabilityParticipant);
-                                    }
-
-                                    /* Availability - Leader: /html/body/div[i]/div[1]/div[1]/span[2]/strong
-                                     * The leader availability may not apply and therefore not exist, but due to the code in
-                                     * sax.js, no error is produced.  Instead, the value at the root SPAN is taken, which
-                                     * corresponds to the availability for participants.  This is not correct, so we first need
-                                     * to check if the value returned applies to "participant" or "leader". */
-                                    // Get the description text that comes after the expected leader availability
-                                    desc = doc.HTML.BODY.DIV.at(i + 1).DIV.at(0).DIV.at(0).SPAN.at(1).text();
-
-                                    // Check to see if this number represents the leader availability
-                                    if (desc.toLowerCase().indexOf("leader") !== -1) {
-                                        // This does represent leader availability, so retrieve the number
-                                        availabilityLeader = Number(doc.HTML.BODY.DIV.at(i + 1).DIV.at(0).DIV.at(0).SPAN
-                                                    .at(1).STRONG.at(0).text());
-
-                                        // Check to see if this number represents the waitlist
-                                        if (desc.toLowerCase().indexOf("waitlist") !== -1) {
-                                            // Make the waitlist number negative
-                                            availabilityLeader = -1 * availabilityLeader;
-                                        }
-
-
-                                        if (availabilityLeader !== activityObj.get("availabilityLeader")) {
-                                            activityObj.set("availabilityLeader", availabilityLeader);
-                                        }
-                                    }
-
-                                    // Difficulty: /html/body/div[i]/div[2]/div[2]
-                                    difficulty = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).DIV.at(1).text();
-
-                                    // Find out if the difficulty rating for this activity is missing
-                                    if (difficulty.toLowerCase().indexOf("difficulty") !== -1) {
-                                        if (difficulty !== activityObj.get("difficulty")) {
-                                            activityObj.set("difficulty", difficulty);
-                                        }
-
-                                        // Activity date(s): /html/body/div[i]/div[2]/div[3]
-                                        activityDate = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).DIV.at(2).text();
-
-                                        // Prerequisites: /html/body/div[i]/div[2]/div[4]
-                                        prereq = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).DIV.at(3).text();
-                                        if (prereq !== activityObj.get("prereq")) {
-                                            activityObj.set("prereq", prereq);
-                                        }
-
-                                    }
-                                    /* Difficulty rating is missing, so Activity Date(s) and Prerequisites are off in position
-                                     * (shifted one DIV up at last level) */
-                                    else {
-                                        if (activityObj.get("difficulty") !== "") {
-                                            activityObj.set("difficulty", "");
-                                        }
-
-                                        // Activity date(s): /html/body/div[i]/div[2]/div[2]
-                                        activityDate = difficulty;  // Use the expected Difficulty value
-
-                                        // Prerequisites: /html/body/div[i]/div[2]/div[3]
-                                        prereq = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).DIV.at(2).text();
-                                        if (prereq !== activityObj.get("prereq")) {
-                                            activityObj.set("prereq", prereq);
-                                        }
-                                    }
-
-                                    // Extract the dates from the Activity Date String
-                                    if (activityDate.indexOf("-") > 0) {  // Represents actual date range
-                                        startDate = new Date(activityDate.substring(0, activityDate.indexOf("-") - 1)
-                                                    .trim());
-                                        endDate = new Date(activityDate.substring(activityDate.indexOf("-") + 1).trim());
-                                    }
-                                    else {  // Single day activity
-                                        startDate = new Date(activityDate);
-                                        endDate = new Date(activityDate);
-                                    }
-
-                                    // Activity start and end dates
-                                    // Check if the backend has a date set
-                                    if (typeof activityObj.get("activityStartDate") !== "undefined") {  // No date
-                                        // Check if the dates match - if not, save the new date
-                                        if (startDate.getTime() !== activityObj.get("activityStartDate").getTime()) {
-                                            activityObj.set("activityStartDate", startDate);
-                                        }
-                                    }
-                                    else {  // No date in backend - save the new date
-                                        activityObj.set("activityStartDate", startDate);
-                                    }
-
-                                    // Check if the backend has a date set
-                                    if (typeof activityObj.get("activityEndDate") !== "undefined") {  // No date
-                                        // Check if the dates match - if not, save the new date
-                                        if (endDate.getTime() !== activityObj.get("activityEndDate").getTime()) {
-                                            activityObj.set("activityEndDate", endDate);
-                                        }
-                                    }
-                                    else {  // No date in backend - save the new date
-                                        activityObj.set("activityEndDate", endDate);
-                                    }
-
-                                    // Registration information: /html/body/div[i]/div[1]/div[1]/div
-                                    regInfo = doc.HTML.BODY.DIV.at(i + 1).DIV.at(0).DIV.at(0).DIV.at(0).text()
-                                                .replace("\n", "").trim();
-
-                                    // Check to make sure activity has not been canceled
-                                    if (regInfo.toLowerCase() != "canceled") {
-                                        // Get the date portion of the registration info string
-                                        regDate = regInfo.substring(regInfo.indexOf(" ", regInfo.length - 7) + 1);
-
-                                        // Get the registration date as a Date object
-                                        regDate = new Date(regDate);
-
-                                        // Assign year to regDate since none is provided
-                                        if (regDate.getMonth() > startDate.getMonth()) {  // Happened in the previous year
-                                            // Set as previous year relative to startDate
-                                            regDate.setFullYear(startDate.getFullYear() - 1);
-                                        }
-                                        else {  // Happened earlier in the year or in the same month - assume same year
-                                            regDate.setFullYear(startDate.getFullYear());  // Set as startDate's year
-                                        }
-
-                                        // Check to see if this is an opening or closing registration date
-                                        if (regInfo.toLowerCase().indexOf("open") !== -1) {  // Opening
-                                            // Check if the backend has a date set
-                                            if (typeof activityObj.get("registrationOpenDate") !== "undefined") {  // No date
-                                                // Check if the dates match - if not, save the new date
-                                                if (regDate.getTime() !== activityObj.get("registrationOpenDate")
-                                                        .getTime()) {
-                                                    activityObj.set("registrationOpenDate", regDate);
-                                                }
-                                            }
-                                            else {  // No date in backend - save the new date
-                                                activityObj.set("registrationOpenDate", regDate);
-                                            }
-                                        }
-                                        else {  // Closing
-                                            // Check if the backend has a date set
-                                            if (typeof activityObj.get("registrationCloseDate") !== "undefined") {  // No date
-                                                // Check if the dates match - if not, save the new date
-                                                if (regDate.getTime() !== activityObj.get("registrationCloseDate")
-                                                        .getTime()) {
-                                                    activityObj.set("registrationCloseDate", regDate);
-                                                }
-                                            }
-                                            else {  // No date in backend - save the new date
-                                                activityObj.set("registrationCloseDate", regDate);
-                                            }
-                                        }
-
-                                        if (activityObj.get("isCanceled") === true) {
-                                            activityObj.set("isCanceled", false);
-                                        }
-                                    }
-                                    else {  // Activity has been canceled
-                                        if (activityObj.get("isCanceled") !== true) {
-                                            activityObj.set("isCanceled", true);
-                                        }
-                                    }
-                                }
-                                catch (err) {
-                                    /* Error while scraping data for real activity.  Display the message but continue to
-                                     * finish the process for this activity.  This is an error on the activity level and not
-                                     * an overall process error so just continue. */
-                                    console.error("Error scraping data fields @ " +
-                                        ((pageNumber - 1) * 50 + i + 1) + ": " + err.message);
-                                }
-
-                                /* Scrape GPS coords and save activity only if it is valid (invalid entry would be the first
-                                 * null entry on last page of results) */
-                                // Get keywords from activity name field
-                                keywords = getKeywords(name, true);
-
-                                // GPS Coordinates
-                                // Create a trivial resolved promise as a base case
-                                additionalInfoPromise = Parse.Promise.as();
-                                additionalInfoPromise = additionalInfoPromise.then(function () {
-                                    return scrapeAdditionalInfo(activityUrl);
-                                }).then(function (additionalInfo) {
-                                    // Leader information
-                                    leader = additionalInfo[0];
-                                    if (leader !== activityObj.get("leader")) {
-                                        activityObj.set("leader", leader);
-                                    }
-                                    if (additionalInfo[1] !== activityObj.get("isQYL")) {
-                                        activityObj.set("isQYL", additionalInfo[1]);
-                                    }
-
-                                    // Assign GPS coordinates
-                                    if (activityObj.get("startLat") !== (additionalInfo[2] === "" ? undefined :
-                                        Number(additionalInfo[2]))) {
-                                        activityObj.set("startLat", additionalInfo[2] === "" ? undefined :
-                                            Number(additionalInfo[2]));
-                                    }
-                                    if (activityObj.get("startLong") !== (additionalInfo[3] === "" ? undefined :
-                                        Number(additionalInfo[3]))) {
-                                        activityObj.set("startLong", additionalInfo[3] === "" ? undefined :
-                                            Number(additionalInfo[3]));
-                                    }
-                                    if (activityObj.get("endLat") !== (additionalInfo[4] === "" ? undefined :
-                                        Number(additionalInfo[4]))) {
-                                        activityObj.set("endLat", additionalInfo[4] === "" ? undefined :
-                                            Number(additionalInfo[4]));
-                                    }
-                                    if (activityObj.get("endLong") !== (additionalInfo[5] === "" ? undefined :
-                                        Number(additionalInfo[5]))) {
-                                        activityObj.set("endLong", additionalInfo[5] === "" ? undefined :
-                                            Number(additionalInfo[5]));
-                                    }
-
-                                    // Get keywords from leader field only if there is a leader value
-                                    if (leader !== null) {
-                                        keywords = keywords.concat(getKeywords(leader, false));
-                                    }
-
-                                    // Check if the keywords were previously defined
-                                    if (typeof activityObj.get("keywords") !== "undefined") {  // Previously defined
-                                        // Get the previous keywords
-                                        previousKeywords = activityObj.get("keywords");
-
-                                        // Compare the string array lengths
-                                        if (keywords.length === previousKeywords.length) {  // Same length
-                                            /* Go through the words and make compare the two sets (will be in the same
-                                             * order if they're the same) */
-                                            for (var j = 0; j < keywords.length; j++) {
-                                                if (keywords[j] !== previousKeywords[j]) {
-                                                    activityObj.set("keywords", keywords);  // Keywords for search
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        else {  // Different length
-                                            activityObj.set("keywords", keywords);  // Keywords for search
-                                        }
-                                    }
-                                    else {  // Not previously defined
-                                        activityObj.set("keywords", keywords);  // Keywords for search
-                                    }
-
-                                    // Check if any field have changed if it is an existing entry
-                                    if (activityObj.dirtyKeys().length !== 0) {  // Fields have changed
-                                        // Save activity object
-                                        activityObj.save(null, {
-                                            success: function (activityObjSave) {
-                                                // Update activity counters
-                                                if (!exists) {
-                                                    newActivities++;
-                                                }
-                                                else {
-                                                    updatedActivities++;
-                                                }
-
-                                                // Move on to the next activity on this page
-                                                if (i < 49) {
-                                                    scrapeNextActivity();
-                                                }
-                                                // Save represents the 50th activity on this page
-                                                else {  // Scraping of this page complete
-                                                    // Resolve this promise (end of this promise thread)
-                                                    activityListScrapePromise.resolve("Page " + pageNumber + " complete!");
-                                                }
-                                            },
-                                            // Error saving activity to Parse class
-                                            error: function (activityObjSave, error) {
-                                                // Reject this promise and send error
-                                                activityListScrapePromise.reject("Failed to create new object.  Error code "
-                                                    + error.code + ": " + error.message);
-                                            }
-                                        });
-                                    }
-                                    else {  // No fields have changed so don't save it to the backend
-                                        // Move on to the next activity on this page
-                                        if (i < 49) {
-                                            scrapeNextActivity();
-                                        }
-                                        // Save represents the 50th activity on this page
-                                        else {  // Scraping of this page complete
-                                            // Resolve this promise (end of this promise thread)
-                                            activityListScrapePromise.resolve("Page " + pageNumber + " complete!");
-                                        }
-                                    }
-                                }, function (error) {
-                                    /* If the activity had been removed but still points to a non-existent link, we'll
-                                     * get an error.  This information is still saved.  This is an error on the activity
-                                     * level and not an overall process error so just continue scraping activities. */
-                                    console.error("Error code " + error + " for \"" + name + "\": " + activityUrl);
-                                    orphanedActivities++;
-
-                                    // Check if the keywords were previously defined
-                                    if (typeof activityObj.get("keywords") !== "undefined") {  // Previously defined
-                                        // Get the previous keywords
-                                        previousKeywords = activityObj.get("keywords");
-
-                                        // Determine if all keywords are contained within previous keywords
-                                        if (keywords.length !== compareKeywords(keywords, previousKeywords)) {
-                                            // Keywords are not all contained
-                                            activityObj.set("keywords", keywords);  // Assign new keywords
-                                        }
-                                    }
-                                    else {  // Not previously defined
-                                        activityObj.set("keywords", keywords);  // Keywords for search
-                                    }
-
-                                    // Check if any field have changed if it is an existing entry
-                                    if (activityObj.dirtyKeys().length !== 0) {  // Fields have changed
-                                        // Save activity object
-                                        activityObj.save(null, {
-                                            success: function (activityObjSave) {
-                                                // Update activity counters
-                                                if (!exists) {
-                                                    newActivities++;
-                                                }
-                                                else {
-                                                    updatedActivities++;
-                                                }
-
-                                                // Move on to the next activity on this page
-                                                if (i < 49) {
-                                                    scrapeNextActivity();
-                                                }
-                                                // Save represents the 50th activity on this page
-                                                else {  // Scraping of this page complete
-                                                    // Resolve this promise (end of this promise thread)
-                                                    activityListScrapePromise.resolve("Page " + pageNumber + " complete!");
-                                                }
-                                            },
-                                            // Error saving activity to Parse class
-                                            error: function (activityObjSave, error) {
-                                                // Reject this promise and send error
-                                                activityListScrapePromise.reject("Failed to create new object.  Error code "
-                                                    + error.code + ": " + error.message);
-                                            }
-                                        });
-                                    }
-                                    else {  // No fields have changed so don't save it to the backend
-                                        // Move on to the next activity on this page
-                                        if (i < 49) {
-                                            scrapeNextActivity();
-                                        }
-                                        // Save represents the 50th activity on this page
-                                        else {  // Scraping of this page complete
-                                            // Resolve this promise (end of this promise thread)
-                                            activityListScrapePromise.resolve("Page " + pageNumber + " complete!");
-                                        }
-                                    }
-                                });
-                            }, function(error) {
-                                // Resolve this promise (end of this promise thread)
-                                activityListScrapePromise.reject(error.toString());
-
-                                i = 50;  // Force out of the "loop" early
-                            });
-                        }
-                    }
-                };
-
-                // This starts off the scraping activity task and then calls the next one once complete
-                scrapeNextActivity();
-            });
-        // Error handler if webpage does not exist
-        }, function(httpResponse) {
-            activityListScrapePromise.reject("Web page request failed with response code " + httpResponse.status);
-        });
-
-        return activityListScrapePromise;  // Return promise so it can be added to the promises array
-    }
-
-    // This function retrieves the total number of pages in a given search (used by filters)
-    function getTotalPages(criteria, baseURL, position) {
-        // Request the first page of results to determine total number of pages (based on links at bottom of page)
-        return Parse.Cloud.httpRequest({
-            url: baseURL + "0" + dateRange,
-            headers: {
-                'User-Agent' : "Mountaineers App Back-End"
+            else if (this[i] != array[i]) {
+                // Warning - two different object instances will never be equal: {x:20} != {x:20}
+                return false;
             }
-        }).then(function (httpResponse) {
-            var html = httpResponse.text;
+        }
 
-            // Figure out how many webpages need to be scraped
-            // Extract number of webpages that need to be scraped and assign to array
-            var endPosition = html.lastIndexOf("</a>");
-            var startPosition = html.lastIndexOf(">", endPosition);
-            var totalPages = parseInt(html.substring(startPosition + 1, endPosition));
+        return true;
+    };
 
-            // Check to see if there was an error getting the total pages
-            if (isNaN(totalPages)) {  // If there is only one page, totalPages is a null number (a.k.a. Not a Number)
-                totalPages = 1;
-            }
-
-            filterTotalPages[position] = totalPages;
-
-            return Parse.Promise.as("Completed determining the total number of web pages for " + criteria + "!");
-        }, function (httpResponse) {  // Could not retrieve initial website
-            // Return Parse error if error is encountered
-            return Parse.Promise.error("Error code: " + httpResponse.status
-                        + ".  Could not retrieve initial web page for " + criteria + ": " + baseURL + "0");
-        });
-
-        return getTotalPagesPromise;
-    }
-
-    // This function sets the filter criteria for all activities
-    function getFilteredURLs(filterCriteriaIndex, baseURL, pageNumber) {
-        // Send request to get the activity webpage
-        return Parse.Cloud.httpRequest({
-            url: baseURL + (pageNumber - 1) * 50 + dateRange,
-            headers: {
-                'User-Agent' : "Mountaineers App Back-End"
-            }
-        }).then(function(httpResponse) {
-            var html = httpResponse.text;
-            var url;
-            var pageListing;
-            var multiplePages = true;
-
-            // Use xmlreader to parse HTML code for all entries and put activity URL into array
-            xmlreader.read(html, function (err, doc) {
-                // There are 50 items on each webpage (except for the last page).  All items start at 0.
-                for (var i = 0; i < 50; i++) {
-                    // See if there is a page listing at the top of the page
-                    try {
-                        pageListing = doc.HTML.BODY.DIV.at(0).attributes().CLASS;
-
-                        // If the above value is listingBar then there are multiple pages
-                        if (pageListing.toLowerCase().trim() === "listingbar") {
-                            multiplePages = true;
-                        }
-                        else {
-                            multiplePages = false;
-                        }
-                    }
-                    catch (err) {  // If there is an error assume it is a single page
-                        multiplePages = false;
-                    }
-
-                    try {
-                        /* There is a special condition where xmlreader.js and sax.js do not function correctly.  For
-                         * the case where there is one result on the webpage, the xmlreader command for i > 1 returns
-                         * the same value as i = 1.  This results in us having 50 URLs that are all the same.  Since
-                         * URLs must be unique, catch this bug by comparing the URL to the previously scraped URL and
-                         * see if it is the same. */
-                        // Webpage Address: HREF at /html/body/div[i]/div[2]/h3/a
-                        if (multiplePages) {
-                            url = doc.HTML.BODY.DIV.at(i + 1).DIV.at(1).H3.at(0).A.at(0).attributes().HREF;
-                        }
-                        else {
-                            url = doc.HTML.BODY.DIV.at(i).DIV.at(1).H3.at(0).A.at(0).attributes().HREF;
-                        }
-
-                        // Check for special condition as described above
-                        if (i === 1 && url === filteredURLs[filterCriteriaIndex][0]) {
-                            return Parse.Promise.as(filterCriteria[filterCriteriaIndex] + " (Page " + pageNumber +
-                                ") URLs have been extracted!");
-                        }
-                        else {  // Not the special condition
-                            totalFilteredActivities = totalFilteredActivities + 1;  // Increment counter
-                            filteredURLs[filterCriteriaIndex].push(url);
-                        }
-                    }
-                    catch (err) {
-                        /* Reached the end of activities for this page.  There are less than 50 activities on
-                         * this page (should only occur for last page) */
-                        return Parse.Promise.as(filterCriteria[filterCriteriaIndex] + " (Page " + pageNumber +
-                                    ") URLs have been extracted!");
-                    }
-                }
-            });
-        // Error handler if webpage does not exist
-        }, function(httpResponse) {
-            return Parse.Promise.error("Could not retrieve " + filterCriteria[filterCriteriaIndex] + " web page #" +
-                        pageNumber + ".  Error code: " + httpResponse.status);
-        });
-    }
-
-    // This function sets the filter criteria for all activities
-    function filterAssignment(filterCriteriaIndex) {
-        /* This promise is monitored by overallScrapePromise and is added to the promises array.  There is a
-         * filterAssignmentPromise promise for each filter criteria. */
-        var filterAssignmentPromise = new Parse.Promise();
+//    /* This function assigns the activity keywords based on the provided field.  The second parameter is used to signal
+//     * that the field is the activity name (special handling required to remove activity type in the name) */
+//    function getKeywords(field, isActivityName) {
+//        var _ = require("underscore");  // Require underscore.js
+//
+//        var toLowerCase = function(w) {
+//            return w.toLowerCase();
+//        };
+//
+//        var keywords = field;
+//        var ignoreWords = ["the", "in", "and", "to", "of", "at", "for", "from", "a", "an", "s"];  // Words to ignore
+//
+//        // If this is the activity name field then drop the activity type that's always printed at the beginning
+//        if (isActivityName) {
+//            // Special condition would be for cross-country ski trips
+//            keywords = keywords.replace(/^cross-country/gi, "");  // Remove the initial chunk that has the hyphen
+//            keywords = keywords.substr(keywords.indexOf("-") + 1);  // Only keep the actual activity name
+//        }
+//
+//        keywords = keywords.split(/\b/);  // Split word by borders
+//
+//        // Filter out only lowercase words that do not match the ignoreWords
+//        keywords = _.map(keywords, toLowerCase);
+//        keywords = _.filter(keywords, function(w) {
+//            return w.match(/^\w+$/) && ! _.contains(ignoreWords, w);
+//        });
+//
+//        keywords = _.uniq(keywords);  // Do not allow duplicate keywords
+//        return keywords;  // Return array of unique qualified keywords
+//    }
+//
+//    /* This function compares two sets of keywords and determines if the first set is contained within the second.  Both
+//     * sets of keywords are in lower case. The number of keywords matched is returned. */
+//    function compareKeywords(curKeywords, prevKeywords) {
+//        var _ = require("underscore");  // Require underscore.js
+//
+//        // Filter which current keywords are contained within the previous keywords
+//        var commonKeywords = _.filter(curKeywords, function(w) {
+//            return _.contains(prevKeywords, w);
+//        });
+//
+//        return commonKeywords.length;  // Return number of common keywords
+//    }
+//
+    /* This function accepts the JSON-formatted activity list (in the form of a JSON object), searches for updates or
+     * additions and saves them in the backend */
+    function scrapeActivity(jsObject) {
+        var scrapeActivityPromise = new Parse.Promise();
+        var activityObj = new ActivityClass();
+        var activity = new activityObject();
         var query;
-        var filter = filterCriteria[filterCriteriaIndex];
+        var exists = false;
+        var i;
+
+//        // Clear the activity object
+//        activity.reset();
+
+        // Assign all values to activity object
+        activity.id = jsObject.id;
+        activity.title = jsObject.title;
+        activity.type = jsObject.activity_type;
+        activity.created = jsObject.created;
+        activity.modified = jsObject.modified;
+        activity.start = jsObject.start;
+        activity.end = jsObject.end;
+        activity.url = jsObject.url;
+        activity.audience = jsObject.audience;
+        activity.leaderAvail = jsObject.leader_availability;
+        activity.participantAvail = jsObject.participant_availability;
+        activity.branch = jsObject.branch;
+        activity.climbingCat = jsObject.climbing_category;
+        activity.skiingCat = jsObject.skiing_category;
+        activity.snowshoeingCat = jsObject.snowshoeing_category;
+        activity.difficulty = jsObject.difficulty;
+        activity.endLocation = jsObject.geo_end;
+        activity.guestFee = jsObject.guest_fee;
+        activity.memberFee = jsObject.member_fee;
+        activity.imageUrl = jsObject.image;
+        activity.leaders = jsObject.leaders;
+        activity.leaderRating = jsObject.leader_rating;
+        activity.prerequisites = jsObject.prerequisites;
+        activity.registrationStart = jsObject.registration_start;
+        activity.registrationEnd = jsObject.registration_end;
+        activity.status = jsObject.status;
+        activity.startLocation = jsObject.geo_start;
 
         // Get list of Parse objects that correspond to the activity URLs
-        query = new Parse.Query(ActivityClass);  // Create new query
-        // ... where the object corresponds to one of the filtered activity URLs
-        query.containedIn("activityUrl", filteredURLs[filterCriteriaIndex]);
+        query = new Parse.Query(PARSE_CONST.CLASS_ACTIVITY);  // Create new query
+        // ... where the object corresponds to the Activity ID
+        query.equalTo(PARSE_CONST.KEY_ACTIVITY_ID, activity.id);
 
-        // ... where the activity start date occurs sometime in the future (includes current day)
-        /* Note that the time below is adjusting a day back since an activity date is saved at the beginning of
-         * its day (i.e. at midnight).  All time is in UTC. */
-        if (!dateAll) {  // Only set this restriction if looking at future activities
-            query.greaterThan("activityStartDate", new Date(new Date().getTime() - (24 * 60 * 60 * 1000)));
-        }
+        // Launch query and retrieve object matching the specified query
+        query.first().then(function (object) {  // Previous activity found
+            // Check if a duplicate activity was found
+            if (typeof object !== "undefined") {  // Duplicate found so use this existing object
+                // Use the existing activity object
+                activityObj = object;
+                exists = true;
+            }
 
-        // ... where the filter criteria value is currently not true (i.e. false or undefined)
-        query.notEqualTo(filter, true);
-        /* ... give us only this filter criteria field of interest (do not send other fields to minimize resource
-         * usage) */
-        query.select(filter);
-        query.limit(1000);  // Set query results to the max of 1000
+            return Parse.Promise.as();
+        }, function (error) {  // Query was not able to run
+            return Parse.Promise.error("Not able to check if activity id " + activity.id + " is a duplicate");
+        }).then(function () {  // No error encountered while running query
+            // Activity ID
+            if (activity.id !== activityObj.get(PARSE_CONST.KEY_ACTIVITY_ID)) {
+                activityObj.set(PARSE_CONST.KEY_ACTIVITY_ID, activity.id);
+            }
 
-        // Launch query and retrieve objects matching the specified query
-        query.find().then(function (results) {
-            // If any activities are returned matching our criteria then update and save
-            if (results.length !== 0) {
-                for (var i = 0; i < results.length; i++) {
-                    results[i].set(filter, true);  // Set this filter criteria value to true
+            // Activity Title
+            if (activity.title !== activityObj.get(PARSE_CONST.KEY_ACTIVITY_TITLE)) {
+                activityObj.set(PARSE_CONST.KEY_ACTIVITY_TITLE, activity.title);
+            }
+
+            // Activity Type Category
+            for (i = 0; i < activity.type.length; i++) {
+                // Determine which categories are listed
+                if (activity.type[i] === JSON_CONST.KEY_TYPE_ADVENTURE_CLUB) {
+                    activity.isAdventureClub = true;
                 }
-
-                trueCounter = trueCounter + results.length;
-                return Parse.Object.saveAll(results);  // Save all results
-            }
-            else {  // No activities found so no updates needed
-                return Parse.Promise.as("No updates needed");  // Return resolved promise to move onto next step
-            }
-        }).then(function (results) {
-            /* Update any activities that did not show up on this filtered activity list to set its filter criteria
-             * value to false (if it was set to true previously) */
-
-            // Get list of Parse objects that do not correspond to the activity URLs
-            query = new Parse.Query(ActivityClass);  // Create new query
-            // ... where the object does not correspond to one of the filtered activity URLs
-            query.notContainedIn("activityUrl", filteredURLs[filterCriteriaIndex]);
-
-            // ... where the activity start date occurs sometime in the future (includes current day)
-            /* Note that the time below is adjusting a day back since an activity date is saved at the beginning of
-             * its day (i.e. at midnight).  All time is in UTC. */
-            if (!dateAll) {  // Only set this restriction if looking at future activities
-                query.greaterThan("activityStartDate", new Date(new Date().getTime() - (24 * 60 * 60 * 1000)));
-            }
-
-            // ... where the filter criteria value is currently true
-            query.equalTo(filter, true);
-            /* ... give us only this filter criteria field of interest (do not send other fields to minimize resource
-             * usage) */
-            query.select(filter);
-            query.limit(1000);  // Set query results to the max of 1000
-
-            // Launch query and retrieve objects matching the specified query
-            return query.find();
-        }).then(function (results) {
-            // If any activities are returned matching our criteria then update and save
-            if (results.length !== 0) {
-                for (var i = 0; i < results.length; i++) {
-                    results[i].set(filter, false);  // Set this filter criteria value to false
+//                        else if (activity.type[i] === JSON_CONST.KEY_TYPE_AVALANCHE_SAFETY) {
+//                            activity.isAvalancheSafety = true;
+//                        }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_BACKPACKING) {
+                    activity.isBackpacking = true;
                 }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_CLIMBING) {
+                    activity.isClimbing = true;
+                }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_DAY_HIKING) {
+                    activity.isDayHiking = true;
+                }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_EXPLORERS) {
+                    activity.isExplorers = true;
+                }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_EXPLORING_NATURE) {
+                    activity.isExploringNature = true;
+                }
+//                        else if (activity.type[i] === JSON_CONST.KEY_TYPE_FIRST_AID) {
+//                            activity.isFirstAid = true;
+//                        }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_GLOBAL_ADVENTURES) {
+                    activity.isGlobalAdventures = true;
+                }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_MOUNTAIN_WORKSHOP) {
+                    activity.isMountainWorkshop = true;
+                }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_NAVIGATION) {
+                    activity.isNavigation = true;
+                }
+//                        else if (activity.type[i] === JSON_CONST.KEY_TYPE_OUTDOOR_LEADERSHIP) {
+//                            activity.isOutdoorLeadership = true;
+//                        }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_PHOTOGRAPHY) {
+                    activity.isPhotography = true;
+                }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_SAILING) {
+                    activity.isSailing = true;
+                }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_SCRAMBLING) {
+                    activity.isScrambling = true;
+                }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_SEA_KAYAKING) {
+                    activity.isSeaKayaking = true;
+                }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_SKIING_SNOWBOARDING) {
+                    activity.isSkiingSnowboarding = true;
+                }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_SNOWSHOEING) {
+                    activity.isSnowshoeing = true;
+                }
+//                        else if (activity.type[i] === JSON_CONST.KEY_TYPE_STAND_UP_PADDLING) {
+//                            activity.isStandUpPaddling = true;
+//                        }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_STEWARDSHIP) {
+                    activity.isStewardship = true;
+                }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_TRAIL_RUNNING) {
+                    activity.isTrailRunning = true;
+                }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_URBAN_ADVENTURE) {
+                    activity.isUrbanAdventure = true;
+                }
+                else if (activity.type[i] === JSON_CONST.KEY_TYPE_YOUTH) {
+                    activity.isYouthType = true;
+                }
+                else {  // New activity type that is not currently accounted for
+                    console.log("New activity type: " + activity.type[i]);
+                }
+            }
 
-                falseCounter = falseCounter + results.length;
-                return Parse.Object.saveAll(results);  // Save all results
+            // Now assign the values for the activity type categories
+            if (activity.isAdventureClub !== activityObj.get(PARSE_CONST.KEY_ADVENTURE_CLUB)) {
+                activityObj.set(PARSE_CONST.KEY_ADVENTURE_CLUB, activity.isAdventureClub);
             }
-            else {  // No activities found so no updates needed
-                return Parse.Promise.as("No updates needed");  // Return resolved promise to move onto next step
+//                    if (activity.isAvalancheSafety !== activityObj.get(PARSE_CONST.KEY_AVALANCHE_SAFETY)) {
+//                        activityObj.set(PARSE_CONST.KEY_AVALANCHE_SAFETY, activity.isAvalancheSafety);
+//                    }
+            if (activity.isBackpacking !== activityObj.get(PARSE_CONST.KEY_BACKPACKING)) {
+                activityObj.set(PARSE_CONST.KEY_BACKPACKING, activity.isBackpacking);
             }
-        }).then(function (results) {
-            filterAssignmentPromise.resolve(filter + " has been updated!");
-        }, function (error) {  // Error encountered
-            console.log("Could not update " + filter + ".  " + error.message);
+            if (activity.isClimbing !== activityObj.get(PARSE_CONST.KEY_CLIMBING)) {
+                activityObj.set(PARSE_CONST.KEY_CLIMBING, activity.isClimbing);
+            }
+            if (activity.isDayHiking !== activityObj.get(PARSE_CONST.KEY_DAY_HIKING)) {
+                activityObj.set(PARSE_CONST.KEY_DAY_HIKING, activity.isDayHiking);
+            }
+            if (activity.isExplorers !== activityObj.get(PARSE_CONST.KEY_EXPLORERS)) {
+                activityObj.set(PARSE_CONST.KEY_EXPLORERS, activity.isExplorers);
+            }
+            if (activity.isExploringNature !== activityObj.get(PARSE_CONST.KEY_EXPLORING_NATURE)) {
+                activityObj.set(PARSE_CONST.KEY_EXPLORING_NATURE, activity.isExploringNature);
+            }
+//                    if (activity.isFirstAid !== activityObj.get(PARSE_CONST.KEY_FIRST_AID)) {
+//                        activityObj.set(PARSE_CONST.KEY_FIRST_AID, activity.isFirstAid);
+//                    }
+            if (activity.isGlobalAdventures !== activityObj.get(PARSE_CONST.KEY_GLOBAL_ADVENTURES)) {
+                activityObj.set(PARSE_CONST.KEY_GLOBAL_ADVENTURES, activity.isGlobalAdventures);
+            }
+            if (activity.isMountainWorkshop !== activityObj.get(PARSE_CONST.KEY_MOUNTAIN_WORKSHOP)) {
+                activityObj.set(PARSE_CONST.KEY_MOUNTAIN_WORKSHOP, activity.isMountainWorkshop);
+            }
+            if (activity.isNavigation !== activityObj.get(PARSE_CONST.KEY_NAVIGATION)) {
+                activityObj.set(PARSE_CONST.KEY_NAVIGATION, activity.isNavigation);
+            }
+//                    if (activity.isOutdoorLeadership !== activityObj.get(PARSE_CONST.KEY_OUTDOOR_LEADERSHIP)) {
+//                        activityObj.set(PARSE_CONST.KEY_OUTDOOR_LEADERSHIP, activity.isOutdoorLeadership);
+//                    }
+            if (activity.isPhotography !== activityObj.get(PARSE_CONST.KEY_PHOTOGRAPHY)) {
+                activityObj.set(PARSE_CONST.KEY_PHOTOGRAPHY, activity.isPhotography);
+            }
+            if (activity.isSailing !== activityObj.get(PARSE_CONST.KEY_SAILING)) {
+                activityObj.set(PARSE_CONST.KEY_SAILING, activity.isSailing);
+            }
+            if (activity.isScrambling !== activityObj.get(PARSE_CONST.KEY_SCRAMBLING)) {
+                activityObj.set(PARSE_CONST.KEY_SCRAMBLING, activity.isScrambling);
+            }
+            if (activity.isSeaKayaking !== activityObj.get(PARSE_CONST.KEY_SEA_KAYAKING)) {
+                activityObj.set(PARSE_CONST.KEY_SEA_KAYAKING, activity.isSeaKayaking);
+            }
+            if (activity.isSkiingSnowboarding !== activityObj.get(PARSE_CONST.KEY_SKIING_SNOWBOARDING)) {
+                activityObj.set(PARSE_CONST.KEY_SKIING_SNOWBOARDING, activity.isSkiingSnowboarding);
+            }
+            if (activity.isSnowshoeing !== activityObj.get(PARSE_CONST.KEY_SNOWSHOEING)) {
+                activityObj.set(PARSE_CONST.KEY_SNOWSHOEING, activity.isSnowshoeing);
+            }
+//                    if (activity.isStandUpPaddling !== activityObj.get(PARSE_CONST.KEY_STAND_UP_PADDLING)) {
+//                        activityObj.set(PARSE_CONST.KEY_STAND_UP_PADDLING, activity.isStandUpPaddling);
+//                    }
+            if (activity.isStewardship !== activityObj.get(PARSE_CONST.KEY_STEWARDSHIP)) {
+                activityObj.set(PARSE_CONST.KEY_STEWARDSHIP, activity.isStewardship);
+            }
+            if (activity.isTrailRunning !== activityObj.get(PARSE_CONST.KEY_TRAIL_RUNNING)) {
+                activityObj.set(PARSE_CONST.KEY_TRAIL_RUNNING, activity.isTrailRunning);
+            }
+            if (activity.isUrbanAdventure !== activityObj.get(PARSE_CONST.KEY_URBAN_ADVENTURE)) {
+                activityObj.set(PARSE_CONST.KEY_URBAN_ADVENTURE, activity.isUrbanAdventure);
+            }
+            if (activity.isYouthType !== activityObj.get(PARSE_CONST.KEY_YOUTH_TYPE)) {
+                activityObj.set(PARSE_CONST.KEY_YOUTH_TYPE, activity.isYouthType);
+            }
+
+            // Activity Creation Date
+            if (activity.created !== activityObj.get(PARSE_CONST.KEY_ACTIVITY_CREATION_DATE)) {
+                activityObj.set(PARSE_CONST.KEY_ACTIVITY_CREATION_DATE, activity.created);
+            }
+
+            // Activity Modification Date
+            if (activity.modified !== activityObj.get(PARSE_CONST.KEY_ACTIVITY_MODIFICATION_DATE)) {
+                activityObj.set(PARSE_CONST.KEY_ACTIVITY_MODIFICATION_DATE, activity.modified);
+            }
+
+            // Activity Start Date
+            if (activity.start !== activityObj.get(PARSE_CONST.KEY_ACTIVITY_START_DATE)) {
+                activityObj.set(PARSE_CONST.KEY_ACTIVITY_START_DATE, activity.start);
+            }
+
+            // Activity End Date
+            if (activity.end !== activityObj.get(PARSE_CONST.KEY_ACTIVITY_END_DATE)) {
+                activityObj.set(PARSE_CONST.KEY_ACTIVITY_END_DATE, activity.end);
+            }
+
+            // Activity URL
+            if (activity.url !== activityObj.get(PARSE_CONST.KEY_ACTIVITY_URL)) {
+                activityObj.set(PARSE_CONST.KEY_ACTIVITY_URL, activity.url);
+            }
+
+            // Audience - "For" Category
+            for (i = 0; i < activity.audience.length; i++) {
+                // Determine which categories are listed
+                if (activity.audience[i] === JSON_CONST.KEY_AUDIENCE_ADULTS) {
+                    activity.isAdults = true;
+                }
+                else if (activity.audience[i] === JSON_CONST.KEY_AUDIENCE_FAMILIES) {
+                    activity.isFamilies = true;
+                }
+                else if (activity.audience[i] === JSON_CONST.KEY_AUDIENCE_RETIRED_ROVERS) {
+                    activity.isRetiredRovers = true;
+                }
+                else if (activity.audience[i] === JSON_CONST.KEY_AUDIENCE_SINGLES) {
+                    activity.isSingles = true;
+                }
+                else if (activity.audience[i] === JSON_CONST.KEY_AUDIENCE_20_30_SOMETHINGS) {
+                    activity.is2030Somethings = true;
+                }
+                else if (activity.audience[i] === JSON_CONST.KEY_AUDIENCE_YOUTH) {
+                    activity.isYouth = true;
+                }
+                else {  // New audience category that is not currently accounted for
+                    console.log("New audience category: " + activity.audience[i]);
+                }
+            }
+
+            // Now assign the values for the audience categories
+            if (activity.isAdults !== activityObj.get(PARSE_CONST.KEY_ADULTS)) {
+                activityObj.set(PARSE_CONST.KEY_ADULTS, activity.isAdults);
+            }
+            if (activity.isFamilies !== activityObj.get(PARSE_CONST.KEY_FAMILIES)) {
+                activityObj.set(PARSE_CONST.KEY_FAMILIES, activity.isFamilies);
+            }
+            if (activity.isRetiredRovers !== activityObj.get(PARSE_CONST.KEY_RETIRED_ROVERS)) {
+                activityObj.set(PARSE_CONST.KEY_RETIRED_ROVERS, activity.isRetiredRovers);
+            }
+            if (activity.isSingles !== activityObj.get(PARSE_CONST.KEY_SINGLES)) {
+                activityObj.set(PARSE_CONST.KEY_SINGLES, activity.isSingles);
+            }
+            if (activity.is2030Somethings !== activityObj.get(PARSE_CONST.KEY_20_30_SOMETHINGS)) {
+                activityObj.set(PARSE_CONST.KEY_20_30_SOMETHINGS, activity.is2030Somethings);
+            }
+            if (activity.isYouth !== activityObj.get(PARSE_CONST.KEY_YOUTH)) {
+                activityObj.set(PARSE_CONST.KEY_YOUTH, activity.isYouth);
+            }
+
+            // Availability - Leader
+            if (activity.leaderAvail !== activityObj.get(PARSE_CONST.KEY_AVAILABILITY_LEADER)) {
+                activityObj.set(PARSE_CONST.KEY_AVAILABILITY_LEADER, activity.leaderAvail);
+            }
+
+            // Availability - Participant
+            if (activity.participantAvail !== activityObj.get(PARSE_CONST.KEY_AVAILABILITY_PARTICIPANT)) {
+                activityObj.set(PARSE_CONST.KEY_AVAILABILITY_PARTICIPANT, activity.participantAvail);
+            }
+
+            // Branch Category
+            // Determine which category is listed (only one branch category can be assigned)
+            if (activity.branch === JSON_CONST.KEY_BRANCH_THE_MOUNTAINEERS) {
+                activity.isTheMountaineers = true;
+            }
+            else if (activity.branch === JSON_CONST.KEY_BRANCH_BELLINGHAM) {
+                activity.isBellingham = true;
+            }
+            else if (activity.branch === JSON_CONST.KEY_BRANCH_EVERETT) {
+                activity.isEverett = true;
+            }
+            else if (activity.branch === JSON_CONST.KEY_BRANCH_FOOTHILLS) {
+                activity.isFoothills = true;
+            }
+            else if (activity.branch === JSON_CONST.KEY_BRANCH_KITSAP) {
+                activity.isKitsap = true;
+            }
+            else if (activity.branch === JSON_CONST.KEY_BRANCH_OLYMPIA) {
+                activity.isOlympia = true;
+            }
+            else if (activity.branch === JSON_CONST.KEY_BRANCH_OUTDOOR_CENTERS) {
+                activity.isOutdoorCenters = true;
+            }
+            else if (activity.branch === JSON_CONST.KEY_BRANCH_SEATTLE) {
+                activity.isSeattle = true;
+            }
+            else if (activity.branch === JSON_CONST.KEY_BRANCH_TACOMA) {
+                activity.isTacoma = true;
+            }
+            else {  // New branch that is not currently accounted for
+                console.log("New branch: " + activity.branch);
+            }
+
+            // Now assign the values for the audience categories
+            if (activity.isTheMountaineers !== activityObj.get(PARSE_CONST.KEY_THE_MOUNTAINEERS)) {
+                activityObj.set(PARSE_CONST.KEY_THE_MOUNTAINEERS, activity.isTheMountaineers);
+            }
+            if (activity.isBellingham !== activityObj.get(PARSE_CONST.KEY_BELLINGHAM)) {
+                activityObj.set(PARSE_CONST.KEY_BELLINGHAM, activity.isBellingham);
+            }
+            if (activity.isEverett !== activityObj.get(PARSE_CONST.KEY_EVERETT)) {
+                activityObj.set(PARSE_CONST.KEY_EVERETT, activity.isEverett);
+            }
+            if (activity.isFoothills !== activityObj.get(PARSE_CONST.KEY_FOOTHILLS)) {
+                activityObj.set(PARSE_CONST.KEY_FOOTHILLS, activity.isFoothills);
+            }
+            if (activity.isKitsap !== activityObj.get(PARSE_CONST.KEY_KITSAP)) {
+                activityObj.set(PARSE_CONST.KEY_KITSAP, activity.isKitsap);
+            }
+            if (activity.isOlympia !== activityObj.get(PARSE_CONST.KEY_OLYMPIA)) {
+                activityObj.set(PARSE_CONST.KEY_OLYMPIA, activity.isOlympia);
+            }
+            if (activity.isOutdoorCenters !== activityObj.get(PARSE_CONST.KEY_OUTDOOR_CENTERS)) {
+                activityObj.set(PARSE_CONST.KEY_OUTDOOR_CENTERS, activity.isOutdoorCenters);
+            }
+            if (activity.isSeattle !== activityObj.get(PARSE_CONST.KEY_SEATTLE)) {
+                activityObj.set(PARSE_CONST.KEY_SEATTLE, activity.isSeattle);
+            }
+            if (activity.isTacoma !== activityObj.get(PARSE_CONST.KEY_TACOMA)) {
+                activityObj.set(PARSE_CONST.KEY_TACOMA, activity.isTacoma);
+            }
+
+            // Climbing Category
+            // Determine which category is listed (only one climbing category can be assigned)
+            if (activity.climbingCat === JSON_CONST.KEY_CLIMBING_BASIC_ALPINE) {
+                activity.isBasicAlpine = true;
+            }
+            else if (activity.climbingCat === JSON_CONST.KEY_CLIMBING_INTERMEDIATE_ALPINE) {
+                activity.isIntermediateAlpine = true;
+            }
+//                    else if (activity.climbingCat === JSON_CONST.KEY_CLIMBING_BOULDER) {
+//                        activity.isBoulder = true;
+//                    }
+            else if (activity.climbingCat === JSON_CONST.KEY_CLIMBING_AID_CLIMB) {
+                activity.isAidClimb = true;
+            }
+            else if (activity.climbingCat === JSON_CONST.KEY_CLIMBING_ROCK_CLIMB) {
+                activity.isRockClimb = true;
+            }
+//                    else if (activity.climbingCat === JSON_CONST.KEY_CLIMBING_WATER_ICE) {
+//                        activity.isWaterIce = true;
+//                    }
+            else if (activity.climbingCat !== null) {  // New climbing category that is not currently accounted for
+                console.log("New climbing category: " + activity.climbingCat);
+            }
+
+            // Now assign the values for the climbing categories
+            if (activity.isBasicAlpine !== activityObj.get(PARSE_CONST.KEY_BASIC_ALPINE)) {
+                activityObj.set(PARSE_CONST.KEY_BASIC_ALPINE, activity.isBasicAlpine);
+            }
+            if (activity.isIntermediateAlpine !== activityObj.get(PARSE_CONST.KEY_INTERMEDIATE_ALPINE)) {
+                activityObj.set(PARSE_CONST.KEY_INTERMEDIATE_ALPINE, activity.isIntermediateAlpine);
+            }
+//                    if (activity.isBoulder !== activityObj.get(PARSE_CONST.KEY_BOULDER)) {
+//                        activityObj.set(PARSE_CONST.KEY_BOULDER, activity.isBoulder);
+//                    }
+            if (activity.isAidClimb !== activityObj.get(PARSE_CONST.KEY_AID_CLIMB)) {
+                activityObj.set(PARSE_CONST.KEY_AID_CLIMB, activity.isAidClimb);
+            }
+            if (activity.isRockClimb !== activityObj.get(PARSE_CONST.KEY_ROCK_CLIMB)) {
+                activityObj.set(PARSE_CONST.KEY_ROCK_CLIMB, activity.isRockClimb);
+            }
+//                    if (activity.isWaterIce !== activityObj.get(PARSE_CONST.KEY_WATER_ICE)) {
+//                        activityObj.set(PARSE_CONST.KEY_WATER_ICE, activity.isWaterIce);
+//                    }
+
+            // Skiing Category
+            // Determine which category is listed (only one skiing category can be assigned)
+            if (activity.skiingCat === JSON_CONST.KEY_SKIING_CROSS_COUNTRY) {
+                activity.isCrosscountry = true;
+            }
+            else if (activity.skiingCat === JSON_CONST.KEY_SKIING_BACKCOUNTRY) {
+                activity.isBackcountry = true;
+            }
+            else if (activity.skiingCat === JSON_CONST.KEY_SKIING_GLACIER) {
+                activity.isGlacier = true;
+            }
+            else if (activity.skiingCat !== null) {  // New skiing category that is not currently accounted for
+                console.log("New skiing category: " + activity.skiingCat);
+            }
+
+            // Now assign the values for the skiing categories
+            if (activity.isCrosscountry !== activityObj.get(PARSE_CONST.KEY_CROSS_COUNTRY)) {
+                activityObj.set(PARSE_CONST.KEY_CROSS_COUNTRY, activity.isCrosscountry);
+            }
+            if (activity.isBackcountry !== activityObj.get(PARSE_CONST.KEY_BACKCOUNTRY)) {
+                activityObj.set(PARSE_CONST.KEY_BACKCOUNTRY, activity.isBackcountry);
+            }
+            if (activity.isGlacier !== activityObj.get(PARSE_CONST.KEY_GLACIER)) {
+                activityObj.set(PARSE_CONST.KEY_GLACIER, activity.isGlacier);
+            }
+
+            // Snowshoeing Category
+            // Determine which category is listed (only one snowshoeing category can be assigned)
+            if (activity.snowshoeingCat === JSON_CONST.KEY_SNOWSHOEING_BEGINNER) {
+                activity.isBeginner = true;
+            }
+            else if (activity.snowshoeingCat === JSON_CONST.KEY_SNOWSHOEING_BASIC) {
+                activity.isBasic = true;
+            }
+            else if (activity.snowshoeingCat === JSON_CONST.KEY_SNOWSHOEING_INTERMEDIATE) {
+                activity.isIntermediate = true;
+            }
+            else if (activity.snowshoeingCat !== null) {  // New snowshoeing category that is not currently accounted for
+                console.log("New snowshoeing category: " + activity.snowshoeingCat);
+            }
+
+            // Now assign the values for the snowshoeing categories
+            if (activity.isBeginner !== activityObj.get(PARSE_CONST.KEY_BEGINNER)) {
+                activityObj.set(PARSE_CONST.KEY_BEGINNER, activity.isBeginner);
+            }
+            if (activity.isBasic !== activityObj.get(PARSE_CONST.KEY_BASIC)) {
+                activityObj.set(PARSE_CONST.KEY_BASIC, activity.isBasic);
+            }
+            if (activity.isIntermediate !== activityObj.get(PARSE_CONST.KEY_INTERMEDIATE)) {
+                activityObj.set(PARSE_CONST.KEY_INTERMEDIATE, activity.isIntermediate);
+            }
+
+            // Difficulty
+            if ((activity.difficulty !== null && activity.difficulty.equals(activityObj.get(PARSE_CONST.KEY_DIFFICULTY)))
+                || (activity.difficulty === null && activityObj.get(PARSE_CONST.KEY_DIFFICULTY) !== null)) {
+                activityObj.set(PARSE_CONST.KEY_DIFFICULTY, activity.difficulty);
+            }
+
+            // End Location
+            if (activity.endLocation !== null && activity.endLocation.length === 2) {  // GPS coordinates defined
+                if (activity.endLocation[0] !== activityObj.get(PARSE_CONST.KEY_END_LATITUDE)) {
+                    activityObj.set(PARSE_CONST.KEY_END_LATITUDE, activity.endLocation[0]);
+                }
+                if (activity.endLocation[1] !== activityObj.get(PARSE_CONST.KEY_END_LONGITUDE)) {
+                    activityObj.set(PARSE_CONST.KEY_END_LONGITUDE, activity.endLocation[1]);
+                }
+            }
+            else { // No coordinates defined
+                if (activityObj.get(PARSE_CONST.KEY_END_LATITUDE) !== null) {
+                    activityObj.set(PARSE_CONST.KEY_END_LATITUDE, null);
+                }
+                if (activityObj.get(PARSE_CONST.KEY_END_LONGITUDE) !== null) {
+                    activityObj.set(PARSE_CONST.KEY_END_LONGITUDE, null);
+                }
+            }
+
+            // Guest Fee
+            if (activity.guestFee !== activityObj.get(PARSE_CONST.KEY_FEE_GUEST)) {
+                activityObj.set(PARSE_CONST.KEY_FEE_GUEST, activity.guestFee);
+            }
+
+            // Member Fee
+            if (activity.memberFee !== activityObj.get(PARSE_CONST.KEY_FEE_MEMBER)) {
+                activityObj.set(PARSE_CONST.KEY_FEE_MEMBER, activity.memberFee);
+            }
+
+            // Image URL
+            if (activity.imageUrl !== activityObj.get(PARSE_CONST.KEY_IMAGE_URL)) {
+                activityObj.set(PARSE_CONST.KEY_IMAGE_URL, activity.imageUrl);
+            }
+
+            // Leader Rating Category
+            // Determine which category is listed (only one leader rating category can be assigned)
+            if (activity.leaderRating === JSON_CONST.KEY_LEADER_FOR_BEGINNERS) {
+                activity.isForBeginners = true;
+            }
+            else if (activity.leaderRating === JSON_CONST.KEY_LEADER_EASY) {
+                activity.isEasy = true;
+            }
+            else if (activity.leaderRating === JSON_CONST.KEY_LEADER_MODERATE) {
+                activity.isModerate = true;
+            }
+            else if (activity.leaderRating === JSON_CONST.KEY_LEADER_CHALLENGING) {
+                activity.isChallenging = true;
+            }
+            else if (activity.leaderRating !== null) {  // New leader rating category that is not currently accounted for
+                console.log("New leader rating category: " + activity.leaderRating);
+            }
+
+            // Now assign the values for the leader rating categories
+            if (activity.isForBeginners !== activityObj.get(PARSE_CONST.KEY_FOR_BEGINNERS)) {
+                activityObj.set(PARSE_CONST.KEY_FOR_BEGINNERS, activity.isForBeginners);
+            }
+            if (activity.isEasy !== activityObj.get(PARSE_CONST.KEY_EASY)) {
+                activityObj.set(PARSE_CONST.KEY_EASY, activity.isEasy);
+            }
+            if (activity.isModerate !== activityObj.get(PARSE_CONST.KEY_MODERATE)) {
+                activityObj.set(PARSE_CONST.KEY_MODERATE, activity.isModerate);
+            }
+            if (activity.isChallenging !== activityObj.get(PARSE_CONST.KEY_CHALLENGING)) {
+                activityObj.set(PARSE_CONST.KEY_CHALLENGING, activity.isChallenging);
+            }
+
+            // Prerequisites
+            if (!activity.prerequisites.equals(activityObj.get(PARSE_CONST.KEY_PREREQUISITES))) {
+                activityObj.set(PARSE_CONST.KEY_PREREQUISITES, activity.prerequisites);
+            }
+
+            // Registration Open Time
+            if (activity.registrationStart !== activityObj.get(PARSE_CONST.KEY_REGISTRATION_OPEN_TIME)) {
+                activityObj.set(PARSE_CONST.KEY_REGISTRATION_OPEN_TIME, activity.registrationStart);
+            }
+
+            // Registration Close Time
+            if (activity.registrationEnd !== activityObj.get(PARSE_CONST.KEY_REGISTRATION_CLOSE_TIME)) {
+                activityObj.set(PARSE_CONST.KEY_REGISTRATION_CLOSE_TIME, activity.registrationEnd);
+            }
+
+            // Activity Status
+            if (activity.status !== activityObj.get(PARSE_CONST.KEY_STATUS)) {
+                activityObj.set(PARSE_CONST.KEY_STATUS, activity.status);
+            }
+
+            // Start Location
+            if (activity.startLocation !== null && activity.startLocation.length === 2) {  // GPS coordinates defined
+                if (activity.startLocation[0] !== activityObj.get(PARSE_CONST.KEY_START_LATITUDE)) {
+                    activityObj.set(PARSE_CONST.KEY_START_LATITUDE, activity.startLocation[0]);
+                }
+                if (activity.startLocation[1] !== activityObj.get(PARSE_CONST.KEY_START_LONGITUDE)) {
+                    activityObj.set(PARSE_CONST.KEY_START_LONGITUDE, activity.startLocation[1]);
+                }
+            }
+            else { // No coordinates defined
+                if (activityObj.get(PARSE_CONST.KEY_START_LATITUDE) !== null) {
+                    activityObj.set(PARSE_CONST.KEY_START_LATITUDE, null);
+                }
+                if (activityObj.get(PARSE_CONST.KEY_START_LONGITUDE) !== null) {
+                    activityObj.set(PARSE_CONST.KEY_START_LONGITUDE, null);
+                }
+            }
+
+            // Leader Information
+            for (i = 0; i < activity.leaders.length; i++) {
+                // Add leader names, roles and QYL statuses to list
+                activity.leaderName.push(activity.leaders[i].name);
+                activity.leaderRole.push(activity.leaders[i].role);
+                activity.leaderQYL.push(activity.leaders[i].qualified_youth_leader);
+            }
+
+            // Now assign the values for the audience categories
+            if (!activity.leaderName.equals(activityObj.get(PARSE_CONST.KEY_LEADER_NAME))) {
+                activityObj.set(PARSE_CONST.KEY_LEADER_NAME, activity.leaderName);
+            }
+            if (!activity.leaderRole.equals(activityObj.get(PARSE_CONST.KEY_LEADER_ROLE))) {
+                activityObj.set(PARSE_CONST.KEY_LEADER_ROLE, activity.leaderRole);
+            }
+            if (!activity.leaderQYL.equals(activityObj.get(PARSE_CONST.KEY_QUALIFIED_YOUTH_LEAD))) {
+                activityObj.set(PARSE_CONST.KEY_QUALIFIED_YOUTH_LEAD, activity.leaderQYL);
+            }
+
+            // Check if any field has been added or changed
+            if (activityObj.dirtyKeys().length !== 0) {  // Fields have changed
+                // Save activity object
+                activityObj.save(null, {
+                    success: function (activityObjSave) {
+                        // Update activity counters
+                        if (!exists) {
+                            newActivities++;
+                        }
+                        else {
+                            updatedActivities++;
+                        }
+
+                        scrapeActivityPromise.resolve();
+                    },
+                    // Error saving activity to Parse class
+                    error: function (activityObjSave, error) {
+                        // Show error message
+                        console.log("Failed to save activity id = " + activity.id + ".  Error code "
+                            + error.code + ": " + error.message);
+
+                        // No big deal - the filters will be updated on the next scraping (run every x minutes on Parse)
+                        scrapeActivityPromise.reject("Failed to save activity id = " + activity.id + ".  Error code "
+                            + error.code + ": " + error.message);
+                    }
+                });
+            }
+            else {  // No need to update the object
+                scrapeActivityPromise.resolve();
+            }
+        }, function (error) {  // Query was not able to run
+            console.log(error);  // Show error message
 
             // No big deal - the filters will be updated on the next scraping (run every x minutes on Parse)
-            filterAssignmentPromise.resolve("Error encountered with " + filter);
+            scrapeActivityPromise.reject(error);
         });
 
-        return filterAssignmentPromise;  // Return promise so it can be added to the promises array
+        return scrapeActivityPromise;
     }
-
 
     /* The code below is what drives this Cloud Background Job.  The order of events is as follows:
      * 1. Download the first page of results for future events
@@ -992,63 +995,17 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
     // Request the first page of results to determine total number of pages (based on links at bottom of page)
     Parse.Cloud.httpRequest({
-        url: "https://www.mountaineers.org/explore/activities/find-activities/@@faceted_query?b_start=0" + dateRange,
+        url: "https://www.mountaineers.org/upcoming-trips.json",
         headers: {
             'User-Agent' : "Mountaineers App Back-End"
         }
     }).then(function(httpResponse) {
-        var html = httpResponse.text;
+        var jsObject = JSON.parse(httpResponse.text);
+        totalActivities = jsObject.length;
 
-        // Figure out how many webpages need to be scraped
-        // Extract number of webpages that need to be scraped
-        var endPosition = html.lastIndexOf("</a>");
-        var startPosition = html.lastIndexOf(">", endPosition);
-        var totalPages = parseInt(html.substring(startPosition + 1, endPosition));
-
-        // Check to see if there was an error getting the total pages
-        if (isNaN(totalPages)) {  // If there is only one page, totalPages is a null number (a.k.a. Not a Number)
-            totalPages = 1;
-        }
-
-        // Kick-off tasks to scrape all other activity webpages
-        for (var i = 1; i <= totalPages; i++) {
-            promises.push(scrapeActivityList(i));
-        }
-
-        return Parse.Promise.when(promises);  // Wait until all promises return resolved (or there is a rejection)
-    }, function (httpResponse) {  // Could not retrieve initial website
-        return Parse.Promise.error("Initial web page request failed with response code " + httpResponse.status);
-    }).then(function() {
-        promises.length = 0;  // Clear the promises array
-
-        // Get the total pages for each category
-        for (var i = 0; i < filterCriteria.length; i++) {
-            promises.push(getTotalPages(filterCriteria[i], filterBaseUrl[i], i));
-        }
-
-        return Parse.Promise.when(promises);  // Wait until all promises return resolved (or there is a rejection)
-    }).then(function() {
-        promises.length = 0;  // Clear the promises array
-
-        // Initialize filteredURLs array
-        for (var i = 0; i < filterCriteria.length; i++) {
-            filteredURLs[i] = [];
-        }
-
-        // Start the filter assignment task for each category (iterate over the total number of pages
-        for (i = 0; i < filterCriteria.length; i++) {
-            for (var j = 1; j <= filterTotalPages[i]; j++) {
-                promises.push(getFilteredURLs(i, filterBaseUrl[i], j));
-            }
-        }
-
-        return Parse.Promise.when(promises);  // Wait until all promises return resolved (or there is a rejection)
-    }).then(function() {
-        promises.length = 0;  // Clear the promises array
-
-        // Start the filter assignment task for each category (iterate over the total number of pages
-        for (var i = 0; i < filterCriteria.length; i++) {
-            promises.push(filterAssignment(i));
+        // Load the activity object
+        for (var i = 0; i < jsObject.length; i++) {
+            promises.push(scrapeActivity(jsObject[i]));
         }
 
         return Parse.Promise.when(promises);  // Wait until all promises return resolved (or there is a rejection)
