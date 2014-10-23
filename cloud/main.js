@@ -358,6 +358,8 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         var activity = new activityObject();
         var query;
         var keywords = [];
+        var leaderRoleTypes = [0,0,0,0,0];
+        var leaderPosition = 0;
         var exists = false;
         var i;
 
@@ -938,9 +940,40 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             // Leader Information
             for (i = 0; i < activity.leaders.length; i++) {
                 // Add leader names, roles and QYL statuses to list
-                activity.leaderName.push(activity.leaders[i].name);
-                activity.leaderRole.push(activity.leaders[i].role);
-                activity.leaderQYL.push(activity.leaders[i].qualified_youth_leader);
+                // Check leader role type
+                if (activity.leaders[i].role.indexOf("Primary") != -1) {  // Primary Leader
+                    // Determine location in arrays to add information
+                    leaderPosition = leaderRoleTypes[0];
+                    leaderRoleTypes[0]++;  // Increment number of primary leaders
+                }
+                else if (activity.leaders[i].role.indexOf("Co") != -1) {  // Co-Leader
+                    // Determine location in arrays to add information
+                    leaderPosition = leaderRoleTypes[0] + leaderRoleTypes[1];
+                    leaderRoleTypes[1]++;  // Increment number of co-leaders
+                }
+                else if (activity.leaders[i].role.indexOf("Assistant") != -1) {  // Assistant Leader
+                    // Determine location in arrays to add information
+                    leaderPosition = leaderRoleTypes[0] + leaderRoleTypes[1] + leaderRoleTypes[2];
+                    leaderRoleTypes[2]++;  // Increment number of assistant leaders
+                }
+                else if (activity.leaders[i].role.indexOf("Mentored") != -1) {  // Mentored Leader
+                    // Determine location in arrays to add information
+                    leaderPosition = leaderRoleTypes[0] + leaderRoleTypes[1] + leaderRoleTypes[2] + leaderRoleTypes[3];
+                    leaderRoleTypes[3]++;  // Increment number of mentored leaders
+                }
+                else {  // Unknown leader type
+                    // Determine location in arrays to add information
+                    leaderPosition = leaderRoleTypes[0] + leaderRoleTypes[1] + leaderRoleTypes[2] + leaderRoleTypes[3]
+                        + leaderRoleTypes[4];
+                    leaderRoleTypes[4]++;  // Increment number of unknown leader types
+
+                    console.log("New leader role type: " + activity.leaders[i].role);
+                }
+
+                // Add leader information to the arrays
+                activity.leaderName.splice(leaderPosition, 0, activity.leaders[i].name);
+                activity.leaderRole.splice(leaderPosition, 0, activity.leaders[i].role);
+                activity.leaderQYL.splice(leaderPosition, 0, activity.leaders[i].qualified_youth_leader);
             }
 
             // Now assign the values for the audience categories
@@ -985,7 +1018,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                             + error.code + ": " + error.message);
 
                         // No big deal - the filters will be updated on the next scraping (run every x minutes on Parse)
-                        scrapeActivityPromise.reject("Failed to save activity id = " + activity.id + ".  Error code "
+                        scrapeActivityPromise.resolve("Failed to save activity id = " + activity.id + ".  Error code "
                             + error.code + ": " + error.message);
                     }
                 });
@@ -997,7 +1030,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             console.log(error);  // Show error message
 
             // No big deal - the filters will be updated on the next scraping (run every x minutes on Parse)
-            scrapeActivityPromise.reject(error);
+            scrapeActivityPromise.resolve(error);
         });
 
         return scrapeActivityPromise;
