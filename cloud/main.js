@@ -175,7 +175,9 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         this.url = null;
         this.audience = null;
         this.leaderAvail = null;
+        this.leaderWaitlist = null;
         this.participantAvail = null;
+        this.participantWaitlist = null;
         this.branch = null;
         this.climbingCat = null;
         this.skiingCat = null;
@@ -257,6 +259,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     var updatedActivities = 0;  // Counter for updated existing activities
     var totalActivities = 0;  // Keeps track of all activities reviewed for changed content (excluded filter criteria)
     var startTime = new Date();
+    var numComplete = 0;
 
     // Define listener to handle completion event
     var onCompletionListener = new Parse.Promise();  // Create a trivial resolved promise as a base case
@@ -358,7 +361,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         var activity = new activityObject();
         var query;
         var keywords = [];
-        var leaderRoleTypes = [0,0,0,0,0];
+        var leaderRoleTypes = [0,0,0,0,0,0];
         var leaderPosition = 0;
         var exists = false;
         var i;
@@ -374,7 +377,9 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         activity.url = jsObject.url;
         activity.audience = jsObject.audience;
         activity.leaderAvail = jsObject.leader_availability;
+        activity.leaderWaitlist = jsObject.leader_waitlist_length;
         activity.participantAvail = jsObject.participant_availability;
+        activity.participantWaitlist = jsObject.participant_waitlist_length;
         activity.branch = jsObject.branch;
         activity.climbingCat = jsObject.climbing_category;
         activity.skiingCat = jsObject.skiing_category;
@@ -417,11 +422,11 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
             // Title Information
             // Check if this is a cross-country trip
-            if (activity.title.indexOf(/^cross-country/gi) != -1) {  // Yes
+            if (activity.title.indexOf("Cross-country") === 0) {  // Yes
                 // Assign title header
-                activity.titleHeader = activity.title.substr(0, "cross-country".length - 1).trim();
+                activity.titleHeader = activity.title.substr(0, activity.title.indexOf("-", "Cross-country".length)).trim();
                 // Remove the initial chunk that has the hyphen
-                activity.title.replace(/^cross-country/gi, "");
+                activity.title = activity.title.replace("Cross-country", "");
             }
             else {
                 // Assign title header
@@ -442,79 +447,81 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             }
 
             // Activity Type Category
-            for (i = 0; i < activity.type.length; i++) {
-                // Determine which categories are listed
-                if (activity.type[i] === JSON_CONST.KEY_TYPE_ADVENTURE_CLUB) {
-                    activity.isTypeAdventureClub = true;
-                }
+            if (activity.type) {  // Ignore null types
+                for (i = 0; i < activity.type.length; i++) {
+                    // Determine which categories are listed
+                    if (activity.type[i] === JSON_CONST.KEY_TYPE_ADVENTURE_CLUB) {
+                        activity.isTypeAdventureClub = true;
+                    }
 //                        else if (activity.type[i] === JSON_CONST.KEY_TYPE_AVALANCHE_SAFETY) {
 //                            activity.isTypeAvalancheSafety = true;
 //                        }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_BACKPACKING) {
-                    activity.isTypeBackpacking = true;
-                }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_CLIMBING) {
-                    activity.isTypeClimbing = true;
-                }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_DAY_HIKING) {
-                    activity.isTypeDayHiking = true;
-                }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_EXPLORERS) {
-                    activity.isTypeExplorers = true;
-                }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_EXPLORING_NATURE) {
-                    activity.isTypeExploringNature = true;
-                }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_BACKPACKING) {
+                        activity.isTypeBackpacking = true;
+                    }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_CLIMBING) {
+                        activity.isTypeClimbing = true;
+                    }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_DAY_HIKING) {
+                        activity.isTypeDayHiking = true;
+                    }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_EXPLORERS) {
+                        activity.isTypeExplorers = true;
+                    }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_EXPLORING_NATURE) {
+                        activity.isTypeExploringNature = true;
+                    }
 //                        else if (activity.type[i] === JSON_CONST.KEY_TYPE_FIRST_AID) {
 //                            activity.isTypeFirstAid = true;
 //                        }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_GLOBAL_ADVENTURES) {
-                    activity.isTypeGlobalAdventures = true;
-                }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_MOUNTAIN_WORKSHOP) {
-                    activity.isTypeMountainWorkshop = true;
-                }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_NAVIGATION) {
-                    activity.isTypeNavigation = true;
-                }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_GLOBAL_ADVENTURES) {
+                        activity.isTypeGlobalAdventures = true;
+                    }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_MOUNTAIN_WORKSHOP) {
+                        activity.isTypeMountainWorkshop = true;
+                    }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_NAVIGATION) {
+                        activity.isTypeNavigation = true;
+                    }
 //                        else if (activity.type[i] === JSON_CONST.KEY_TYPE_OUTDOOR_LEADERSHIP) {
 //                            activity.isTypeOutdoorLeadership = true;
 //                        }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_PHOTOGRAPHY) {
-                    activity.isTypePhotography = true;
-                }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_SAILING) {
-                    activity.isTypeSailing = true;
-                }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_SCRAMBLING) {
-                    activity.isTypeScrambling = true;
-                }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_SEA_KAYAKING) {
-                    activity.isTypeSeaKayaking = true;
-                }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_SKIING_SNOWBOARDING) {
-                    activity.isTypeSkiingSnowboarding = true;
-                }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_SNOWSHOEING) {
-                    activity.isTypeSnowshoeing = true;
-                }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_PHOTOGRAPHY) {
+                        activity.isTypePhotography = true;
+                    }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_SAILING) {
+                        activity.isTypeSailing = true;
+                    }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_SCRAMBLING) {
+                        activity.isTypeScrambling = true;
+                    }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_SEA_KAYAKING) {
+                        activity.isTypeSeaKayaking = true;
+                    }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_SKIING_SNOWBOARDING) {
+                        activity.isTypeSkiingSnowboarding = true;
+                    }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_SNOWSHOEING) {
+                        activity.isTypeSnowshoeing = true;
+                    }
 //                        else if (activity.type[i] === JSON_CONST.KEY_TYPE_STAND_UP_PADDLING) {
 //                            activity.isTypeStandUpPaddling = true;
 //                        }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_STEWARDSHIP) {
-                    activity.isTypeStewardship = true;
-                }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_TRAIL_RUNNING) {
-                    activity.isTypeTrailRunning = true;
-                }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_URBAN_ADVENTURE) {
-                    activity.isTypeUrbanAdventure = true;
-                }
-                else if (activity.type[i] === JSON_CONST.KEY_TYPE_YOUTH) {
-                    activity.isTypeYouth = true;
-                }
-                else {  // New activity type that is not currently accounted for
-                    console.log("New activity type: " + activity.type[i]);
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_STEWARDSHIP) {
+                        activity.isTypeStewardship = true;
+                    }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_TRAIL_RUNNING) {
+                        activity.isTypeTrailRunning = true;
+                    }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_URBAN_ADVENTURE) {
+                        activity.isTypeUrbanAdventure = true;
+                    }
+                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_YOUTH) {
+                        activity.isTypeYouth = true;
+                    }
+                    else {  // New activity type that is not currently accounted for
+                        console.log("New activity type: " + activity.type[i]);
+                    }
                 }
             }
 
@@ -661,13 +668,28 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             }
 
             // Availability - Leader
-            if (activity.leaderAvail !== activityObj.get(PARSE_CONST.KEY_AVAILABILITY_LEADER)) {
-                activityObj.set(PARSE_CONST.KEY_AVAILABILITY_LEADER, activity.leaderAvail);
+            if (activity.leaderAvail === 0) {  // No leader space available on the trip
+                if (-activity.leaderWaitlist !== activityObj.get(PARSE_CONST.KEY_AVAILABILITY_LEADER)) {
+                    activityObj.set(PARSE_CONST.KEY_AVAILABILITY_LEADER, -activity.leaderWaitlist);
+                }
+            }
+            else {  // Still leader room on trip
+                if (activity.leaderAvail !== activityObj.get(PARSE_CONST.KEY_AVAILABILITY_LEADER)) {
+                    activityObj.set(PARSE_CONST.KEY_AVAILABILITY_LEADER, activity.leaderAvail);
+                }
             }
 
+
             // Availability - Participant
-            if (activity.participantAvail !== activityObj.get(PARSE_CONST.KEY_AVAILABILITY_PARTICIPANT)) {
-                activityObj.set(PARSE_CONST.KEY_AVAILABILITY_PARTICIPANT, activity.participantAvail);
+            if (activity.participantAvail === 0) {  // No participant space available on the trip
+                if (-activity.participantWaitlist !== activityObj.get(PARSE_CONST.KEY_AVAILABILITY_PARTICIPANT)) {
+                    activityObj.set(PARSE_CONST.KEY_AVAILABILITY_PARTICIPANT, -activity.participantWaitlist);
+                }
+            }
+            else {  // Still participant room on trip
+                if (activity.participantAvail !== activityObj.get(PARSE_CONST.KEY_AVAILABILITY_PARTICIPANT)) {
+                    activityObj.set(PARSE_CONST.KEY_AVAILABILITY_PARTICIPANT, activity.participantAvail);
+                }
             }
 
             // Branch Category
@@ -699,7 +721,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             else if (activity.branch === JSON_CONST.KEY_BRANCH_TACOMA) {
                 activity.isBranchTacoma = true;
             }
-            else {  // New branch that is not currently accounted for
+            else if (activity.branch) {  // New branch that is not currently accounted for
                 console.log("New branch: " + activity.branch);
             }
 
@@ -941,31 +963,37 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             for (i = 0; i < activity.leaders.length; i++) {
                 // Add leader names, roles and QYL statuses to list
                 // Check leader role type
-                if (activity.leaders[i].role.indexOf("Primary") != -1) {  // Primary Leader
+                if (activity.leaders[i].role.indexOf("Instructor") != -1) {  // Instructor
                     // Determine location in arrays to add information
                     leaderPosition = leaderRoleTypes[0];
-                    leaderRoleTypes[0]++;  // Increment number of primary leaders
+                    leaderRoleTypes[0]++;  // Increment number of instructors
+                }
+                else if (activity.leaders[i].role.indexOf("Primary") != -1) {  // Primary Leader
+                    // Determine location in arrays to add information
+                    leaderPosition = leaderRoleTypes[0] + leaderRoleTypes[1];
+                    leaderRoleTypes[1]++;  // Increment number of primary leaders
                 }
                 else if (activity.leaders[i].role.indexOf("Co") != -1) {  // Co-Leader
                     // Determine location in arrays to add information
-                    leaderPosition = leaderRoleTypes[0] + leaderRoleTypes[1];
-                    leaderRoleTypes[1]++;  // Increment number of co-leaders
+                    leaderPosition = leaderRoleTypes[0] + leaderRoleTypes[1] + leaderRoleTypes[2];
+                    leaderRoleTypes[2]++;  // Increment number of co-leaders
                 }
                 else if (activity.leaders[i].role.indexOf("Assistant") != -1) {  // Assistant Leader
                     // Determine location in arrays to add information
-                    leaderPosition = leaderRoleTypes[0] + leaderRoleTypes[1] + leaderRoleTypes[2];
-                    leaderRoleTypes[2]++;  // Increment number of assistant leaders
+                    leaderPosition = leaderRoleTypes[0] + leaderRoleTypes[1] + leaderRoleTypes[2] + leaderRoleTypes[3];
+                    leaderRoleTypes[3]++;  // Increment number of assistant leaders
                 }
                 else if (activity.leaders[i].role.indexOf("Mentored") != -1) {  // Mentored Leader
                     // Determine location in arrays to add information
-                    leaderPosition = leaderRoleTypes[0] + leaderRoleTypes[1] + leaderRoleTypes[2] + leaderRoleTypes[3];
-                    leaderRoleTypes[3]++;  // Increment number of mentored leaders
+                    leaderPosition = leaderRoleTypes[0] + leaderRoleTypes[1] + leaderRoleTypes[2] + leaderRoleTypes[3]
+                        + leaderRoleTypes[4];
+                    leaderRoleTypes[4]++;  // Increment number of mentored leaders
                 }
                 else {  // Unknown leader type
                     // Determine location in arrays to add information
                     leaderPosition = leaderRoleTypes[0] + leaderRoleTypes[1] + leaderRoleTypes[2] + leaderRoleTypes[3]
-                        + leaderRoleTypes[4];
-                    leaderRoleTypes[4]++;  // Increment number of unknown leader types
+                        + leaderRoleTypes[4] + leaderRoleTypes[5];
+                    leaderRoleTypes[5]++;  // Increment number of unknown leader types
 
                     console.log("New leader role type: " + activity.leaders[i].role);
                 }
@@ -1036,6 +1064,47 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         return scrapeActivityPromise;
     }
 
+    function recur(jsObject, complete){
+        var batchPromise;
+
+        if (complete) {
+
+        }
+        else {
+            // Create a trivial resolved promise as a base case
+            batchPromise = Parse.Promise.as();
+            batchPromise = batchPromise.then(function () {
+                return scrapeAdditionalInfo(activityUrl);
+            }).then(function (additionalInfo) {
+
+            });
+        }
+    }
+
+    function recursive(jsObject) {
+        var increment = 1;
+
+        // Load the activity object
+        for (var i = numComplete; i < numComplete + increment && i < jsObject.length; i++) {
+            promises.push(scrapeActivity(jsObject[i]));
+        }
+
+        // Wait until all promises return resolved (or there is a rejection)
+        Parse.Promise.when(promises).then(function () {
+            numComplete = numComplete + increment;  // Increment the counter
+
+            // Check whether another recursive run is required to get all of the activities
+            if (numComplete < jsObject.length) {
+                recursive(jsObject);
+            }
+            else {
+                onCompletionListener.resolve();  // Tell the listener all promises were resolved
+            }
+        }, function (error) {
+            onCompletionListener.reject(error);  // Send error through to listener
+        });
+    }
+
     // The code below is what drives this Cloud Background Job.
 
     // Request the activity data in JSON format
@@ -1048,15 +1117,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         var jsObject = JSON.parse(httpResponse.text);
         totalActivities = jsObject.length;
 
-        // Load the activity object
-        for (var i = 0; i < jsObject.length; i++) {
-            promises.push(scrapeActivity(jsObject[i]));
-        }
-
-        return Parse.Promise.when(promises);  // Wait until all promises return resolved (or there is a rejection)
-    }).then(function() {
-        onCompletionListener.resolve();  // Tell the listener all promises were resolved
-    }, function (error) {
-        onCompletionListener.reject(error);  // Send error through to listener
+        // Recursive scrape activities in batches of 100
+        recursive(jsObject);
     });
 });
