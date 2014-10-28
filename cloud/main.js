@@ -23,10 +23,8 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         // Climbing
         KEY_CLIMBING_BASIC_ALPINE: "Basic Alpine",
         KEY_CLIMBING_INTERMEDIATE_ALPINE: "Intermediate Alpine",
-        //KEY_CLIMBING_BOULDER: "Boulder",
         KEY_CLIMBING_AID_CLIMB: "Aid Climb",
         KEY_CLIMBING_ROCK_CLIMB: "Rock Climb",
-        //KEY_CLIMBING_WATER_ICE: "Water Ice",
         // Rating
         KEY_RATING_FOR_BEGINNERS: "For Beginners (Getting Started Series)",
         KEY_RATING_EASY: "Easy",
@@ -42,24 +40,20 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         KEY_SNOWSHOEING_INTERMEDIATE: "Intermediate",
         // Type
         KEY_TYPE_ADVENTURE_CLUB: "Adventure Club",
-        //KEY_TYPE_AVALANCHE_SAFETY: "Avalanche Safety",
         KEY_TYPE_BACKPACKING: "Backpacking",
         KEY_TYPE_CLIMBING: "Climbing",
         KEY_TYPE_DAY_HIKING: "Day Hiking",
         KEY_TYPE_EXPLORERS: "Explorers",
         KEY_TYPE_EXPLORING_NATURE: "Exploring Nature",
-        //KEY_TYPE_FIRST_AID: "FirstAid",
         KEY_TYPE_GLOBAL_ADVENTURES: "Global Adventures",
         KEY_TYPE_MOUNTAIN_WORKSHOP: "Mountain Workshop",
         KEY_TYPE_NAVIGATION: "Navigation",
-        //KEY_TYPE_OUTDOOR_LEADERSHIP: "Outdoor Leadership",
         KEY_TYPE_PHOTOGRAPHY: "Photography",
         KEY_TYPE_SAILING: "Sailing",
         KEY_TYPE_SCRAMBLING: "Scrambling",
         KEY_TYPE_SEA_KAYAKING: "Sea Kayaking",
         KEY_TYPE_SKIING_SNOWBOARDING: "Skiing/Snowboarding",
         KEY_TYPE_SNOWSHOEING: "Snowshoeing",
-        //KEY_TYPE_STAND_UP_PADDLING: "Stand Up Paddling",
         KEY_TYPE_STEWARDSHIP: "Stewardship",
         KEY_TYPE_TRAIL_RUNNING: "Trail Running",
         KEY_TYPE_URBAN_ADVENTURE: "Urban Adventure",
@@ -120,10 +114,8 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         // Climbing
         KEY_CLIMBING_BASIC_ALPINE: "isClimbingBasicAlpine",
         KEY_CLIMBING_INTERMEDIATE_ALPINE: "isClimbingIntermediateAlpine",
-        // KEY_CLIMBING_BOULDER: "isClimbingBoulder",
         KEY_CLIMBING_AID_CLIMB: "isClimbingAidClimb",
         KEY_CLIMBING_ROCK_CLIMB: "isClimbingRockClimb",
-        //KEY_CLIMBING_WATER_ICE: "isClimbingWaterIce",
         // Leader Rating
         KEY_RATING_FOR_BEGINNERS: "isRatingForBeginners",
         KEY_RATING_EASY: "isRatingEasy",
@@ -139,35 +131,31 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         KEY_SNOWSHOEING_INTERMEDIATE: "isSnowshoeingIntermediate",
         // Type
         KEY_TYPE_ADVENTURE_CLUB: "isTypeAdventureClub",
-        //KEY_TYPE_AVALANCHE_SAFETY: "isTypeAvalancheSafety",
         KEY_TYPE_BACKPACKING: "isTypeBackpacking",
         KEY_TYPE_CLIMBING: "isTypeClimbing",
         KEY_TYPE_DAY_HIKING: "isTypeDayHiking",
         KEY_TYPE_EXPLORERS: "isTypeExplorers",
         KEY_TYPE_EXPLORING_NATURE: "isTypeExploringNature",
-        //KEY_TYPE_FIRST_AID: "isTypeFirstAid",
         KEY_TYPE_GLOBAL_ADVENTURES: "isTypeGlobalAdventures",
         KEY_TYPE_MOUNTAIN_WORKSHOP: "isTypeMountainWorkshop",
         KEY_TYPE_NAVIGATION: "isTypeNavigation",
-        //KEY_TYPE_OUTDOOR_LEADERSHIP: "isTypeOutdoorLeadership",
         KEY_TYPE_PHOTOGRAPHY: "isTypePhotography",
         KEY_TYPE_SAILING: "isTypeSailing",
         KEY_TYPE_SCRAMBLING: "isTypeScrambling",
         KEY_TYPE_SEA_KAYAKING: "isTypeSeaKayaking",
         KEY_TYPE_SKIING_SNOWBOARDING: "isTypeSkiingSnowboarding",
         KEY_TYPE_SNOWSHOEING: "isTypeSnowshoeing",
-        //KEY_TYPE_STAND_UP_PADDLING: "isTypeStandUpPaddling",
         KEY_TYPE_STEWARDSHIP: "isTypeStewardship",
         KEY_TYPE_TRAIL_RUNNING: "isTypeTrailRunning",
         KEY_TYPE_URBAN_ADVENTURE: "isTypeUrbanAdventure",
         KEY_TYPE_YOUTH: "isTypeYouth"
     };
 
-    function activityObject(){
+    function ActivityObject(){
         this.id = null;
         this.title = null;
         this.titleHeader = null;
-        this.type = null;
+        this.type = [];
         this.created = null;
         this.modified = null;
         this.start = null;
@@ -198,24 +186,20 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         this.leaderRole = [];
         this.startLocation = null;
         this.isTypeAdventureClub = false;
-        //this.isTypeAvalancheSafety = false;
         this.isTypeBackpacking = false;
         this.isTypeClimbing = false;
         this.isTypeDayHiking = false;
         this.isTypeExplorers = false;
         this.isTypeExploringNature = false;
-        //this.isTypeFirstAid = false;
         this.isTypeGlobalAdventures = false;
         this.isTypeMountainWorkshop = false;
         this.isTypeNavigation = false;
-        //this.isTypeOutdoorLeadership = false;
         this.isTypePhotography = false;
         this.isTypeSailing = false;
         this.isTypeScrambling = false;
         this.isTypeSeaKayaking = false;
         this.isTypeSkiingSnowboarding = false;
         this.isTypeSnowshoeing = false;
-        //this.isTypeStandUpPaddling = false;
         this.isTypeStewardship = false;
         this.isTypeTrailRunning = false;
         this.isTypeUrbanAdventure = false;
@@ -241,10 +225,8 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         this.isBranchTacoma = false;
         this.isClimbingBasicAlpine = false;
         this.isClimbingIntermediateAlpine = false;
-        //this.isClimbingBoulder = false;
         this.isClimbingAidClimb = false;
         this.isClimbingRockClimb = false;
-        //this.isClimbingWaterIce = false;
         this.isSkiingCrossCountry = false;
         this.isSkiingBackcountry = false;
         this.isSkiingGlacier = false;
@@ -320,10 +302,8 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             return w.toLowerCase();
         };
 
-        var keywords = [];
         var ignoreWords = ["the", "in", "and", "to", "of", "at", "for", "from", "a", "an", "s"];  // Words to ignore
-
-        keywords = field.split(/\b/);  // Split word by borders
+        var keywords = field.split(/\b/);  // Split word by borders
 
         // Filter out only lowercase words that do not match the ignoreWords
         keywords = _.map(keywords, toLowerCase);
@@ -358,7 +338,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     function scrapeActivity(jsObject) {
         var scrapeActivityPromise = new Parse.Promise();
         var activityObj = new ActivityClass();
-        var activity = new activityObject();
+        var activity = new ActivityObject();
         var query;
         var keywords = [];
         var leaderRoleTypes = [0,0,0,0,0,0];
@@ -413,7 +393,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
             return Parse.Promise.as();
         }, function (error) {  // Query was not able to run
-            return Parse.Promise.error("Not able to check if activity id " + activity.id + " is a duplicate");
+            return Parse.Promise.error("Not able to check activity id " + activity.id);
         }).then(function () {  // No error encountered while running query
             // Activity ID
             if (activity.id !== activityObj.get(PARSE_CONST.KEY_ACTIVITY_ID)) {
@@ -453,9 +433,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                     if (activity.type[i] === JSON_CONST.KEY_TYPE_ADVENTURE_CLUB) {
                         activity.isTypeAdventureClub = true;
                     }
-//                        else if (activity.type[i] === JSON_CONST.KEY_TYPE_AVALANCHE_SAFETY) {
-//                            activity.isTypeAvalancheSafety = true;
-//                        }
                     else if (activity.type[i] === JSON_CONST.KEY_TYPE_BACKPACKING) {
                         activity.isTypeBackpacking = true;
                     }
@@ -471,9 +448,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                     else if (activity.type[i] === JSON_CONST.KEY_TYPE_EXPLORING_NATURE) {
                         activity.isTypeExploringNature = true;
                     }
-//                        else if (activity.type[i] === JSON_CONST.KEY_TYPE_FIRST_AID) {
-//                            activity.isTypeFirstAid = true;
-//                        }
                     else if (activity.type[i] === JSON_CONST.KEY_TYPE_GLOBAL_ADVENTURES) {
                         activity.isTypeGlobalAdventures = true;
                     }
@@ -483,9 +457,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                     else if (activity.type[i] === JSON_CONST.KEY_TYPE_NAVIGATION) {
                         activity.isTypeNavigation = true;
                     }
-//                        else if (activity.type[i] === JSON_CONST.KEY_TYPE_OUTDOOR_LEADERSHIP) {
-//                            activity.isTypeOutdoorLeadership = true;
-//                        }
                     else if (activity.type[i] === JSON_CONST.KEY_TYPE_PHOTOGRAPHY) {
                         activity.isTypePhotography = true;
                     }
@@ -504,9 +475,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                     else if (activity.type[i] === JSON_CONST.KEY_TYPE_SNOWSHOEING) {
                         activity.isTypeSnowshoeing = true;
                     }
-//                        else if (activity.type[i] === JSON_CONST.KEY_TYPE_STAND_UP_PADDLING) {
-//                            activity.isTypeStandUpPaddling = true;
-//                        }
                     else if (activity.type[i] === JSON_CONST.KEY_TYPE_STEWARDSHIP) {
                         activity.isTypeStewardship = true;
                     }
@@ -525,13 +493,16 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                 }
             }
 
+            // Save entire type array to Parse if it has changed
+            if (activity.type !== null && !activity.type.equals(activityObj.get(PARSE_CONST.KEY_ACTIVITY_TYPE))
+                || (activity.type === null && activityObj.get(PARSE_CONST.KEY_ACTIVITY_TYPE) !== null)) {
+                activityObj.set(PARSE_CONST.KEY_ACTIVITY_TYPE, activity.type);
+            }
+
             // Now assign the values for the activity type categories
             if (activity.isTypeAdventureClub !== activityObj.get(PARSE_CONST.KEY_TYPE_ADVENTURE_CLUB)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_ADVENTURE_CLUB, activity.isTypeAdventureClub);
             }
-//                    if (activity.isTypeAvalancheSafety !== activityObj.get(PARSE_CONST.KEY_TYPE_AVALANCHE_SAFETY)) {
-//                        activityObj.set(PARSE_CONST.KEY_TYPE_AVALANCHE_SAFETY, activity.isTypeAvalancheSafety);
-//                    }
             if (activity.isTypeBackpacking !== activityObj.get(PARSE_CONST.KEY_TYPE_BACKPACKING)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_BACKPACKING, activity.isTypeBackpacking);
             }
@@ -547,9 +518,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             if (activity.isTypeExploringNature !== activityObj.get(PARSE_CONST.KEY_TYPE_EXPLORING_NATURE)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_EXPLORING_NATURE, activity.isTypeExploringNature);
             }
-//                    if (activity.isTypeFirstAid !== activityObj.get(PARSE_CONST.KEY_TYPE_FIRST_AID)) {
-//                        activityObj.set(PARSE_CONST.KEY_TYPE_FIRST_AID, activity.isTypeFirstAid);
-//                    }
             if (activity.isTypeGlobalAdventures !== activityObj.get(PARSE_CONST.KEY_TYPE_GLOBAL_ADVENTURES)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_GLOBAL_ADVENTURES, activity.isTypeGlobalAdventures);
             }
@@ -559,9 +527,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             if (activity.isTypeNavigation !== activityObj.get(PARSE_CONST.KEY_TYPE_NAVIGATION)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_NAVIGATION, activity.isTypeNavigation);
             }
-//                    if (activity.isTypeOutdoorLeadership !== activityObj.get(PARSE_CONST.KEY_TYPE_OUTDOOR_LEADERSHIP)) {
-//                        activityObj.set(PARSE_CONST.KEY_TYPE_OUTDOOR_LEADERSHIP, activity.isTypeOutdoorLeadership);
-//                    }
             if (activity.isTypePhotography !== activityObj.get(PARSE_CONST.KEY_TYPE_PHOTOGRAPHY)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_PHOTOGRAPHY, activity.isTypePhotography);
             }
@@ -580,9 +545,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             if (activity.isTypeSnowshoeing !== activityObj.get(PARSE_CONST.KEY_TYPE_SNOWSHOEING)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_SNOWSHOEING, activity.isTypeSnowshoeing);
             }
-//                    if (activity.isTypeStandUpPaddling !== activityObj.get(PARSE_CONST.KEY_TYPE_STAND_UP_PADDLING)) {
-//                        activityObj.set(PARSE_CONST.KEY_TYPE_STAND_UP_PADDLING, activity.isTypeStandUpPaddling);
-//                    }
             if (activity.isTypeStewardship !== activityObj.get(PARSE_CONST.KEY_TYPE_STEWARDSHIP)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_STEWARDSHIP, activity.isTypeStewardship);
             }
@@ -762,18 +724,12 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             else if (activity.climbingCat === JSON_CONST.KEY_CLIMBING_INTERMEDIATE_ALPINE) {
                 activity.isClimbingIntermediateAlpine = true;
             }
-//                    else if (activity.climbingCat === JSON_CONST.KEY_CLIMBING_BOULDER) {
-//                        activity.isClimbingBoulder = true;
-//                    }
             else if (activity.climbingCat === JSON_CONST.KEY_CLIMBING_AID_CLIMB) {
                 activity.isClimbingAidClimb = true;
             }
             else if (activity.climbingCat === JSON_CONST.KEY_CLIMBING_ROCK_CLIMB) {
                 activity.isClimbingRockClimb = true;
             }
-//                    else if (activity.climbingCat === JSON_CONST.KEY_CLIMBING_WATER_ICE) {
-//                        activity.isClimbingWaterIce = true;
-//                    }
             else if (activity.climbingCat !== null) {  // New climbing category that is not currently accounted for
                 console.log("New climbing category: " + activity.climbingCat);
             }
@@ -785,18 +741,12 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             if (activity.isClimbingIntermediateAlpine !== activityObj.get(PARSE_CONST.KEY_CLIMBING_INTERMEDIATE_ALPINE)) {
                 activityObj.set(PARSE_CONST.KEY_CLIMBING_INTERMEDIATE_ALPINE, activity.isClimbingIntermediateAlpine);
             }
-//                    if (activity.isClimbingBoulder !== activityObj.get(PARSE_CONST.KEY_CLIMBING_BOULDER)) {
-//                        activityObj.set(PARSE_CONST.KEY_CLIMBING_BOULDER, activity.isClimbingBoulder);
-//                    }
             if (activity.isClimbingAidClimb !== activityObj.get(PARSE_CONST.KEY_CLIMBING_AID_CLIMB)) {
                 activityObj.set(PARSE_CONST.KEY_CLIMBING_AID_CLIMB, activity.isClimbingAidClimb);
             }
             if (activity.isClimbingRockClimb !== activityObj.get(PARSE_CONST.KEY_CLIMBING_ROCK_CLIMB)) {
                 activityObj.set(PARSE_CONST.KEY_CLIMBING_ROCK_CLIMB, activity.isClimbingRockClimb);
             }
-//                    if (activity.isClimbingWaterIce !== activityObj.get(PARSE_CONST.KEY_CLIMBING_WATER_ICE)) {
-//                        activityObj.set(PARSE_CONST.KEY_CLIMBING_WATER_ICE, activity.isClimbingWaterIce);
-//                    }
 
             // Skiing Category
             // Determine which category is listed (only one skiing category can be assigned)
@@ -1064,23 +1014,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         return scrapeActivityPromise;
     }
 
-    function recur(jsObject, complete){
-        var batchPromise;
-
-        if (complete) {
-
-        }
-        else {
-            // Create a trivial resolved promise as a base case
-            batchPromise = Parse.Promise.as();
-            batchPromise = batchPromise.then(function () {
-                return scrapeAdditionalInfo(activityUrl);
-            }).then(function (additionalInfo) {
-
-            });
-        }
-    }
-
     function recursive(jsObject) {
         var increment = 1;
 
@@ -1114,10 +1047,13 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             'User-Agent' : "Mountaineers App Back-End"
         }
     }).then(function(httpResponse) {
+        // Hello object literal!
         var jsObject = JSON.parse(httpResponse.text);
         totalActivities = jsObject.length;
 
-        // Recursive scrape activities in batches of 100
+        // Recursive batch activity scrapings
         recursive(jsObject);
+    }, function (error) {
+        onCompletionListener.reject(error);  // Send error through to listener
     });
 });
