@@ -996,7 +996,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                             + error.code + ": " + error.message);
 
                         // No big deal - the filters will be updated on the next scraping (run every x minutes on Parse)
-                        scrapeActivityPromise.resolve("Failed to save activity id = " + activity.id + ".  Error code "
+                        scrapeActivityPromise.reject("Failed to save activity id = " + activity.id + ".  Error code "
                             + error.code + ": " + error.message);
                     }
                 });
@@ -1008,7 +1008,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             console.log(error);  // Show error message
 
             // No big deal - the filters will be updated on the next scraping (run every x minutes on Parse)
-            scrapeActivityPromise.resolve(error);
+            scrapeActivityPromise.reject(error);
         });
 
         return scrapeActivityPromise;
@@ -1033,8 +1033,8 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             else {
                 onCompletionListener.resolve();  // Tell the listener all promises were resolved
             }
-        }, function (error) {
-            onCompletionListener.reject(error);  // Send error through to listener
+        }, function (error) {  // Either Parse could not pull up the activity record or it could not save it
+            recursive(jsObject);  // Re-run failed scrape
         });
     }
 
