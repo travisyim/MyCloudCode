@@ -1,5 +1,107 @@
-// The following code uses jquery-2.1.1.js, to process (i.e. parse) the JSON data
+// Global constant declaration for all things Parse related (i.e. Parse database field names)
+var PARSE_CONST = {
+    // Classes
+    CLASS_ACTIVITY: "Activities",
+    CLASS_SAVED_SEARCHES: "Searches",
 
+    // Fields
+    KEY_OBJECT_ID: "objectId",
+    KEY_LAST_ACCESS: "lastAccess",
+    KEY_UPDATE_COUNT: "updateCount",
+
+    // Trip Information
+    KEY_ACTIVITY_ID: "activityId",
+    KEY_ACTIVITY_TITLE: "title",
+    KEY_ACTIVITY_TITLE_HEADER: "titleHeader",
+    KEY_ACTIVITY_TYPE: "type",
+    KEY_ACTIVITY_END_DATE: "activityEndDate",
+    KEY_ACTIVITY_START_DATE: "activityStartDate",
+    KEY_ACTIVITY_URL: "activityUrl",
+    KEY_AVAILABILITY_LEADER: "availabilityLeader",
+    KEY_AVAILABILITY_PARTICIPANT: "availabilityParticipant",
+    KEY_BRANCH: "branch",
+    KEY_DIFFICULTY: "difficulty",
+    KEY_END_LATITUDE: "endLat",
+    KEY_END_LONGITUDE: "endLong",
+    KEY_FEE_GUEST: "feeGuest",
+    KEY_FEE_MEMBER: "feeMember",
+    KEY_IMAGE_URL: "imgUrl",
+    KEY_KEYWORDS: "keywords",
+    KEY_LEADER_NAME: "leaderName",
+    KEY_LEADER_ROLE: "leaderRole",
+    KEY_PREREQUISITES: "prereq",
+    KEY_QUALIFIED_YOUTH_LEAD: "isQYL",
+    KEY_REGISTRATION_OPEN_TIME: "registrationOpenDate",
+    KEY_REGISTRATION_CLOSE_TIME: "registrationCloseDate",
+    KEY_START_LATITUDE: "startLat",
+    KEY_START_LONGITUDE: "startLong",
+    KEY_STATUS: "status",
+
+    // Filter Categories
+    // Audience
+    KEY_AUDIENCE_ADULTS: "isAudienceAdults",
+    KEY_AUDIENCE_FAMILIES: "isAudienceFamilies",
+    KEY_AUDIENCE_RETIRED_ROVERS: "isAudienceRetiredRovers",
+    KEY_AUDIENCE_SINGLES: "isAudienceSingles",
+    KEY_AUDIENCE_20_30_SOMETHINGS: "isAudience2030Somethings",
+    KEY_AUDIENCE_YOUTH: "isAudienceYouth",
+    // Branch
+    KEY_BRANCH_THE_MOUNTAINEERS: "isBranchTheMountaineers",
+    KEY_BRANCH_BELLINGHAM: "isBranchBellingham",
+    KEY_BRANCH_EVERETT: "isBranchEverett",
+    KEY_BRANCH_FOOTHILLS: "isBranchFoothills",
+    KEY_BRANCH_KITSAP: "isBranchKitsap",
+    KEY_BRANCH_OLYMPIA: "isBranchOlympia",
+    KEY_BRANCH_OUTDOOR_CENTERS: "isBranchOutdoorCenters",
+    KEY_BRANCH_SEATTLE: "isBranchSeattle",
+    KEY_BRANCH_TACOMA: "isBranchTacoma",
+    // Climbing
+    KEY_CLIMBING_BASIC_ALPINE: "isClimbingBasicAlpine",
+    KEY_CLIMBING_INTERMEDIATE_ALPINE: "isClimbingIntermediateAlpine",
+    KEY_CLIMBING_AID_CLIMB: "isClimbingAidClimb",
+    KEY_CLIMBING_ROCK_CLIMB: "isClimbingRockClimb",
+    // Leader Rating
+    KEY_RATING_FOR_BEGINNERS: "isRatingForBeginners",
+    KEY_RATING_EASY: "isRatingEasy",
+    KEY_RATING_MODERATE: "isRatingModerate",
+    KEY_RATING_CHALLENGING: "isRatingChallenging",
+    // Skiing
+    KEY_SKIING_CROSS_COUNTRY: "isSkiingCrossCountry",
+    KEY_SKIING_BACKCOUNTRY: "isSkiingBackcountry",
+    KEY_SKIING_GLACIER: "isSkiingGlacier",
+    // Snowshoeing
+    KEY_SNOWSHOEING_BEGINNER: "isSnowshoeingBeginner",
+    KEY_SNOWSHOEING_BASIC: "isSnowshoeingBasic",
+    KEY_SNOWSHOEING_INTERMEDIATE: "isSnowshoeingIntermediate",
+    // Type
+    KEY_TYPE_ADVENTURE_CLUB: "isTypeAdventureClub",
+    KEY_TYPE_BACKPACKING: "isTypeBackpacking",
+    KEY_TYPE_CLIMBING: "isTypeClimbing",
+    KEY_TYPE_DAY_HIKING: "isTypeDayHiking",
+    KEY_TYPE_EXPLORERS: "isTypeExplorers",
+    KEY_TYPE_EXPLORING_NATURE: "isTypeExploringNature",
+    KEY_TYPE_GLOBAL_ADVENTURES: "isTypeGlobalAdventures",
+    KEY_TYPE_MOUNTAIN_WORKSHOP: "isTypeMountainWorkshop",
+    KEY_TYPE_NAVIGATION: "isTypeNavigation",
+    KEY_TYPE_PHOTOGRAPHY: "isTypePhotography",
+    KEY_TYPE_SAILING: "isTypeSailing",
+    KEY_TYPE_SCRAMBLING: "isTypeScrambling",
+    KEY_TYPE_SEA_KAYAKING: "isTypeSeaKayaking",
+    KEY_TYPE_SKIING_SNOWBOARDING: "isTypeSkiingSnowboarding",
+    KEY_TYPE_SNOWSHOEING: "isTypeSnowshoeing",
+    KEY_TYPE_STEWARDSHIP: "isTypeStewardship",
+    KEY_TYPE_TRAIL_RUNNING: "isTypeTrailRunning",
+    KEY_TYPE_URBAN_ADVENTURE: "isTypeUrbanAdventure",
+    KEY_TYPE_YOUTH: "isTypeYouth",
+
+    // Activity creation and update dates
+    KEY_ACTIVITY_CREATION_DATE: "activityCreatedAt",  // Provided in Mountaineers' JSON feed
+    KEY_ACTIVITY_MODIFICATION_DATE: "activityModifiedAt",  // Provided in Mountaineers' JSON feed (does not reflect all data)
+    KEY_ACTIVITY_ADDED_AT: "activityAddedAt",  // Used for evaluating save searches
+    KEY_ACTIVITY_UPDATED_AT: "activityUpdatedAt"  // Used for evaluating save searches
+};
+
+// The following cloud code scrapes the Mountaineers' JSON activity feed
 Parse.Cloud.job("UpdateActivities", function (request, status) {
     // Constant declaration for all things JSON related (i.e. attribues listed in Mountaineers' JSON feed)
     var JSON_CONST = {
@@ -60,98 +162,8 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         KEY_TYPE_YOUTH: "Youth"
     };
 
-    // Constant declaration for all things Parse related (i.e. Parse database field names)
-    var PARSE_CONST = {
-        // Classes
-        CLASS_ACTIVITY: "Test",
-
-        // Trip Information
-        KEY_ACTIVITY_ID: "activityId",
-        KEY_ACTIVITY_TITLE: "title",
-        KEY_ACTIVITY_TITLE_HEADER: "titleHeader",
-        KEY_ACTIVITY_TYPE: "type",
-        KEY_ACTIVITY_END_DATE: "activityEndDate",
-        KEY_ACTIVITY_START_DATE: "activityStartDate",
-        KEY_ACTIVITY_URL: "activityUrl",
-        KEY_AVAILABILITY_LEADER: "availabilityLeader",
-        KEY_AVAILABILITY_PARTICIPANT: "availabilityParticipant",
-        KEY_BRANCH: "branch",
-        KEY_DIFFICULTY: "difficulty",
-        KEY_END_LATITUDE: "endLat",
-        KEY_END_LONGITUDE: "endLong",
-        KEY_FEE_GUEST: "feeGuest",
-        KEY_FEE_MEMBER: "feeMember",
-        KEY_IMAGE_URL: "imgUrl",
-        KEY_KEYWORDS: "keywords",
-        KEY_LEADER_NAME: "leaderName",
-        KEY_LEADER_ROLE: "leaderRole",
-        KEY_PREREQUISITES: "prereq",
-        KEY_QUALIFIED_YOUTH_LEAD: "isQYL",
-        KEY_REGISTRATION_OPEN_TIME: "registrationOpenDate",
-        KEY_REGISTRATION_CLOSE_TIME: "registrationCloseDate",
-        KEY_START_LATITUDE: "startLat",
-        KEY_START_LONGITUDE: "startLong",
-        KEY_STATUS: "status",
-
-        // Filter Categories
-        // Audience
-        KEY_AUDIENCE_ADULTS: "isAudienceAdults",
-        KEY_AUDIENCE_FAMILIES: "isAudienceFamilies",
-        KEY_AUDIENCE_RETIRED_ROVERS: "isAudienceRetiredRovers",
-        KEY_AUDIENCE_SINGLES: "isAudienceSingles",
-        KEY_AUDIENCE_20_30_SOMETHINGS: "isAudience2030Somethings",
-        KEY_AUDIENCE_YOUTH: "isAudienceYouth",
-        // Branch
-        KEY_BRANCH_THE_MOUNTAINEERS: "isBranchTheMountaineers",
-        KEY_BRANCH_BELLINGHAM: "isBranchBellingham",
-        KEY_BRANCH_EVERETT: "isBranchEverett",
-        KEY_BRANCH_FOOTHILLS: "isBranchFoothills",
-        KEY_BRANCH_KITSAP: "isBranchKitsap",
-        KEY_BRANCH_OLYMPIA: "isBranchOlympia",
-        KEY_BRANCH_OUTDOOR_CENTERS: "isBranchOutdoorCenters",
-        KEY_BRANCH_SEATTLE: "isBranchSeattle",
-        KEY_BRANCH_TACOMA: "isBranchTacoma",
-        // Climbing
-        KEY_CLIMBING_BASIC_ALPINE: "isClimbingBasicAlpine",
-        KEY_CLIMBING_INTERMEDIATE_ALPINE: "isClimbingIntermediateAlpine",
-        KEY_CLIMBING_AID_CLIMB: "isClimbingAidClimb",
-        KEY_CLIMBING_ROCK_CLIMB: "isClimbingRockClimb",
-        // Leader Rating
-        KEY_RATING_FOR_BEGINNERS: "isRatingForBeginners",
-        KEY_RATING_EASY: "isRatingEasy",
-        KEY_RATING_MODERATE: "isRatingModerate",
-        KEY_RATING_CHALLENGING: "isRatingChallenging",
-        // Skiing
-        KEY_SKIING_CROSS_COUNTRY: "isSkiingCrossCountry",
-        KEY_SKIING_BACKCOUNTRY: "isSkiingBackcountry",
-        KEY_SKIING_GLACIER: "isSkiingGlacier",
-        // Snowshoeing
-        KEY_SNOWSHOEING_BEGINNER: "isSnowshoeingBeginner",
-        KEY_SNOWSHOEING_BASIC: "isSnowshoeingBasic",
-        KEY_SNOWSHOEING_INTERMEDIATE: "isSnowshoeingIntermediate",
-        // Type
-        KEY_TYPE_ADVENTURE_CLUB: "isTypeAdventureClub",
-        KEY_TYPE_BACKPACKING: "isTypeBackpacking",
-        KEY_TYPE_CLIMBING: "isTypeClimbing",
-        KEY_TYPE_DAY_HIKING: "isTypeDayHiking",
-        KEY_TYPE_EXPLORERS: "isTypeExplorers",
-        KEY_TYPE_EXPLORING_NATURE: "isTypeExploringNature",
-        KEY_TYPE_GLOBAL_ADVENTURES: "isTypeGlobalAdventures",
-        KEY_TYPE_MOUNTAIN_WORKSHOP: "isTypeMountainWorkshop",
-        KEY_TYPE_NAVIGATION: "isTypeNavigation",
-        KEY_TYPE_PHOTOGRAPHY: "isTypePhotography",
-        KEY_TYPE_SAILING: "isTypeSailing",
-        KEY_TYPE_SCRAMBLING: "isTypeScrambling",
-        KEY_TYPE_SEA_KAYAKING: "isTypeSeaKayaking",
-        KEY_TYPE_SKIING_SNOWBOARDING: "isTypeSkiingSnowboarding",
-        KEY_TYPE_SNOWSHOEING: "isTypeSnowshoeing",
-        KEY_TYPE_STEWARDSHIP: "isTypeStewardship",
-        KEY_TYPE_TRAIL_RUNNING: "isTypeTrailRunning",
-        KEY_TYPE_URBAN_ADVENTURE: "isTypeUrbanAdventure",
-        KEY_TYPE_YOUTH: "isTypeYouth"
-    };
-
-    function ActivityObject(){
+    // Declaration for activity object
+    function ActivityObject() {
         this.id = null;
         this.title = null;
         this.titleHeader = null;
@@ -185,6 +197,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         this.status = null;
         this.leaderRole = [];
         this.startLocation = null;
+        this.keywords = [];
         this.isTypeAdventureClub = false;
         this.isTypeBackpacking = false;
         this.isTypeClimbing = false;
@@ -237,19 +250,25 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
     var ActivityClass = Parse.Object.extend(PARSE_CONST.CLASS_ACTIVITY);  // Make connection to Activity class
     var promises = [];  // This variable will hold all of the activity scraping promises
+    // Used for letting the scraper activity know when all saved searches update counter processes are complete for the given activity
+    var savedSearchUpdatePromise;
     var newActivities = 0;  // Counter for new activities added
     var updatedActivities = 0;  // Counter for updated existing activities
     var totalActivities = 0;  // Keeps track of all activities reviewed for changed content (excluded filter criteria)
+    var totalSavedSearches = 0;  // Keeps track of all saved searches
     var startTime = new Date();
-    var numComplete = 0;
+    var jsObject;
+    var savedSearches;
+    var numActivityComplete = 0;
+    var numSavedSearchComplete;
 
     // Define listener to handle completion event
     var onCompletionListener = new Parse.Promise();  // Create a trivial resolved promise as a base case
-    onCompletionListener.then(function() {  // Overall job was successful
+    onCompletionListener.then(function () {  // Overall job was successful
         status.success("A total of " + totalActivities + " activities were reviewed: " + newActivities +
-                " activities added and " + updatedActivities + " activities updated.  Scraping took " +
+            " activities added and " + updatedActivities + " activities updated.  Scraping took " +
             (new Date().getTime() - startTime.getTime()) / 1000 + " seconds.");
-    }, function(error) {  // Overall job failed
+    }, function (error) {  // Overall job failed
         status.error(error.toString());
     });
 
@@ -297,18 +316,21 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     // This function assigns the activity keywords based on the provided field
     function getKeywords(field) {
         var _ = require("underscore");  // Require underscore.js
+        var copy = field;
 
-        var toLowerCase = function(w) {
+        var toLowerCase = function (w) {
             return w.toLowerCase();
         };
 
         var ignoreWords = ["the", "in", "and", "to", "of", "at", "for", "from", "a", "an", "s"];  // Words to ignore
-        var keywords = field.split(/\b/);  // Split word by borders
+        var keywordsWordBorders = field.split(/\b/);  // Split word by borders
+        var keywordsSpaces = field.split(/\s+/);  // Split word by spaces
+        var keywords = keywordsWordBorders.concat(keywordsSpaces);  // Combine both keyword arrays
 
         // Filter out only lowercase words that do not match the ignoreWords
         keywords = _.map(keywords, toLowerCase);
-        keywords = _.filter(keywords, function(w) {
-            return w.match(/^\w+$/) && ! _.contains(ignoreWords, w);
+        keywords = _.filter(keywords, function (w) {
+            return w.match(/^\w+$/) && !_.contains(ignoreWords, w);
         });
 
         keywords = _.uniq(keywords);  // Do not allow duplicate keywords
@@ -321,7 +343,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         var _ = require("underscore");  // Require underscore.js
 
         // Filter which current keywords are contained within the previous keywords
-        var commonKeywords = _.filter(curKeywords, function(w) {
+        var commonKeywords = _.filter(curKeywords, function (w) {
             return _.contains(prevKeywords, w);
         });
 
@@ -333,6 +355,286 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         return true;  // Return number of common keywords
     }
 
+    // This function evaluates an unknown length of boolean variables and determines if the values are all equivalent
+    function areAllEqual() {
+        // Check to see if all values are the same
+        for (var i = 1; i < arguments.length; i++) {
+            if (arguments[i] != arguments[0]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // This function accepts the currently saved activity object and updates any applicable saved search update counters
+    function updateSavedSearchCounter(activity, index) {
+        var updateCounterPromise = new Parse.Promise();
+        var result = savedSearches[index];
+        var filter = new ActivityObject();
+        var match = false;
+
+        // Loop structure implemented to allow allow quickly breaking out when activity and saved search do not match
+        do {
+            // Load filter object with the saved search filter's data
+            filter.keywords = result.get(PARSE_CONST.KEY_KEYWORDS);
+
+            // Check for a non-falsy values (i.e. undefined)
+            if (!result.get(PARSE_CONST.KEY_ACTIVITY_START_DATE)) {
+                filter.start = -Number.MAX_VALUE;
+            }
+            else {
+                filter.start = result.get(PARSE_CONST.KEY_ACTIVITY_START_DATE).getTime();
+            }
+            if (!result.get(PARSE_CONST.KEY_ACTIVITY_END_DATE)) {
+                filter.end = Number.MAX_VALUE;
+            }
+            else {
+                filter.end = result.get(PARSE_CONST.KEY_ACTIVITY_END_DATE).getTime();
+            }
+
+            filter.isTypeAdventureClub = result.get(PARSE_CONST.KEY_TYPE_ADVENTURE_CLUB);
+            filter.isTypeBackpacking = result.get(PARSE_CONST.KEY_TYPE_BACKPACKING);
+            filter.isTypeClimbing = result.get(PARSE_CONST.KEY_TYPE_CLIMBING);
+            filter.isTypeDayHiking = result.get(PARSE_CONST.KEY_TYPE_DAY_HIKING);
+            filter.isTypeExplorers = result.get(PARSE_CONST.KEY_TYPE_EXPLORERS);
+            filter.isTypeExploringNature = result.get(PARSE_CONST.KEY_TYPE_EXPLORING_NATURE);
+            filter.isTypeGlobalAdventures = result.get(PARSE_CONST.KEY_TYPE_GLOBAL_ADVENTURES);
+            filter.isTypeMountainWorkshop = result.get(PARSE_CONST.KEY_TYPE_MOUNTAIN_WORKSHOP);
+            filter.isTypeNavigation = result.get(PARSE_CONST.KEY_TYPE_NAVIGATION);
+            filter.isTypePhotography = result.get(PARSE_CONST.KEY_TYPE_PHOTOGRAPHY);
+            filter.isTypeSailing = result.get(PARSE_CONST.KEY_TYPE_SAILING);
+            filter.isTypeScrambling = result.get(PARSE_CONST.KEY_TYPE_SCRAMBLING);
+            filter.isTypeSeaKayaking = result.get(PARSE_CONST.KEY_TYPE_SEA_KAYAKING);
+            filter.isTypeSkiingSnowboarding = result.get(PARSE_CONST.KEY_TYPE_SKIING_SNOWBOARDING);
+            filter.isTypeSnowshoeing = result.get(PARSE_CONST.KEY_TYPE_SNOWSHOEING);
+            filter.isTypeStewardship = result.get(PARSE_CONST.KEY_TYPE_STEWARDSHIP);
+            filter.isTypeTrailRunning = result.get(PARSE_CONST.KEY_TYPE_TRAIL_RUNNING);
+            filter.isTypeUrbanAdventure = result.get(PARSE_CONST.KEY_TYPE_URBAN_ADVENTURE);
+            filter.isTypeYouth = result.get(PARSE_CONST.KEY_TYPE_YOUTH);
+            filter.isRatingForBeginners = result.get(PARSE_CONST.KEY_RATING_FOR_BEGINNERS);
+            filter.isRatingEasy = result.get(PARSE_CONST.KEY_RATING_EASY);
+            filter.isRatingModerate = result.get(PARSE_CONST.KEY_RATING_MODERATE);
+            filter.isRatingChallenging = result.get(PARSE_CONST.KEY_RATING_CHALLENGING);
+            filter.isAudienceAdults = result.get(PARSE_CONST.KEY_AUDIENCE_ADULTS);
+            filter.isAudienceFamilies = result.get(PARSE_CONST.KEY_AUDIENCE_FAMILIES);
+            filter.isAudienceRetiredRovers = result.get(PARSE_CONST.KEY_AUDIENCE_RETIRED_ROVERS);
+            filter.isAudienceSingles = result.get(PARSE_CONST.KEY_AUDIENCE_SINGLES);
+            filter.isAudience2030Somethings = result.get(PARSE_CONST.KEY_AUDIENCE_20_30_SOMETHINGS);
+            filter.isAudienceYouth = result.get(PARSE_CONST.KEY_AUDIENCE_YOUTH);
+            filter.isBranchTheMountaineers = result.get(PARSE_CONST.KEY_BRANCH_THE_MOUNTAINEERS);
+            filter.isBranchBellingham = result.get(PARSE_CONST.KEY_BRANCH_BELLINGHAM);
+            filter.isBranchEverett = result.get(PARSE_CONST.KEY_BRANCH_EVERETT);
+            filter.isBranchFoothills = result.get(PARSE_CONST.KEY_BRANCH_FOOTHILLS);
+            filter.isBranchKitsap = result.get(PARSE_CONST.KEY_BRANCH_KITSAP);
+            filter.isBranchOlympia = result.get(PARSE_CONST.KEY_BRANCH_OLYMPIA);
+            filter.isBranchOutdoorCenters = result.get(PARSE_CONST.KEY_BRANCH_OUTDOOR_CENTERS);
+            filter.isBranchSeattle = result.get(PARSE_CONST.KEY_BRANCH_SEATTLE);
+            filter.isBranchTacoma = result.get(PARSE_CONST.KEY_BRANCH_TACOMA);
+            filter.isClimbingBasicAlpine = result.get(PARSE_CONST.KEY_CLIMBING_BASIC_ALPINE);
+            filter.isClimbingIntermediateAlpine = result.get(PARSE_CONST.KEY_CLIMBING_INTERMEDIATE_ALPINE);
+            filter.isClimbingAidClimb = result.get(PARSE_CONST.KEY_CLIMBING_AID_CLIMB);
+            filter.isClimbingRockClimb = result.get(PARSE_CONST.KEY_CLIMBING_ROCK_CLIMB);
+            filter.isSkiingCrossCountry = result.get(PARSE_CONST.KEY_SKIING_CROSS_COUNTRY);
+            filter.isSkiingBackcountry = result.get(PARSE_CONST.KEY_SKIING_BACKCOUNTRY);
+            filter.isSkiingGlacier = result.get(PARSE_CONST.KEY_SKIING_GLACIER);
+            filter.isSnowshoeingBeginner = result.get(PARSE_CONST.KEY_SNOWSHOEING_BEGINNER);
+            filter.isSnowshoeingBasic = result.get(PARSE_CONST.KEY_SNOWSHOEING_BASIC);
+            filter.isSnowshoeingIntermediate = result.get(PARSE_CONST.KEY_SNOWSHOEING_INTERMEDIATE);
+
+            // Evaluate keywords
+            // Check is keywords is undefined (falsy value check)
+            if (!filter.keywords) {
+                match = true
+            }
+            else {  // At least one keyword defined
+                for (var j = 0; j < filter.keywords.length; j++) {
+                    if (activity.keywords.indexOf(filter.keywords[j]) !== -1) {
+                        match = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!match) {
+                updateCounterPromise.resolve();  // Failed - this saved search does not get updated by this activity
+                break;
+            }
+
+            // Evaluate start and end dates
+            if (filter.start > new Date(activity.start).getTime() || new Date(activity.start).getTime() > filter.end) {
+                updateCounterPromise.resolve();  // Failed - this saved search does not get updated by this activity
+                break;
+            }
+
+            // Evaluate activity type options
+            // Check if they're not all true or not all false
+            if (!areAllEqual(filter.isTypeAdventureClub, filter.isTypeBackpacking, filter.isTypeClimbing,
+                filter.isTypeDayHiking, filter.isTypeExplorers, filter.isTypeExploringNature,
+                filter.isTypeGlobalAdventures, filter.isTypeMountainWorkshop, filter.isTypeNavigation,
+                filter.isTypePhotography, filter.isTypeSailing, filter.isTypeScrambling,
+                filter.isTypeSeaKayaking, filter.isTypeSkiingSnowboarding, filter.isTypeSnowshoeing,
+                filter.isTypeStewardship, filter.isTypeTrailRunning, filter.isTypeUrbanAdventure,
+                filter.isTypeYouth)) {
+                /* The user has selected discrete filters for this category.  Check to see if the activity
+                 * falls into one of the categories selected. */
+                if (!((filter.isTypeAdventureClub && activity.isTypeAdventureClub) ||
+                    (filter.isTypeBackpacking && activity.isTypeBackpacking) ||
+                    (filter.isTypeClimbing && activity.isTypeClimbing) ||
+                    (filter.isTypeDayHiking && activity.isTypeDayHiking) ||
+                    (filter.isTypeExplorers && activity.isTypeExplorers) ||
+                    (filter.isTypeExploringNature && activity.isTypeExploringNature) ||
+                    (filter.isTypeGlobalAdventures && activity.isTypeGlobalAdventures) ||
+                    (filter.isTypeMountainWorkshop && activity.isTypeMountainWorkshop) ||
+                    (filter.isTypeNavigation && activity.isTypeNavigation) ||
+                    (filter.isTypePhotography && activity.isTypePhotography) ||
+                    (filter.isTypeSailing && activity.isTypeSailing) ||
+                    (filter.isTypeScrambling && activity.isTypeScrambling) ||
+                    (filter.isTypeSeaKayaking && activity.isTypeSeaKayaking) ||
+                    (filter.isTypeSkiingSnowboarding && activity.isTypeSkiingSnowboarding) ||
+                    (filter.isTypeSnowshoeing && activity.isTypeSnowshoeing) ||
+                    (filter.isTypeStewardship && activity.isTypeStewardship) ||
+                    (filter.isTypeTrailRunning && activity.isTypeTrailRunning) ||
+                    (filter.isTypeUrbanAdventure && activity.isTypeUrbanAdventure) ||
+                    (filter.isTypeYouth && activity.isTypeYouth))) {
+                    updateCounterPromise.resolve();  // Failed - this saved search does not get updated by this activity
+                    break;
+                }
+            }
+
+            // Evaluate rating options
+            // Check if they're not all true or not all false
+            if (!areAllEqual(filter.isRatingForBeginners, filter.isRatingEasy, filter.isRatingModerate,
+                filter.isRatingChallenging)) {
+                /* The user has selected discrete filters for this category.  Check to see if the activity
+                 * falls into one of the categories selected. */
+                if (!((filter.isRatingForBeginners && activity.isRatingForBeginners) ||
+                    (filter.isRatingEasy && activity.isRatingEasy) ||
+                    (filter.isRatingModerate && activity.isRatingModerate) ||
+                    (filter.isRatingChallenging && activity.isRatingChallenging))) {
+                    updateCounterPromise.resolve();  // Failed - this saved search does not get updated by this activity
+                    break;
+                }
+            }
+
+            // Evaluate audience options
+            if (!areAllEqual(filter.isAudienceAdults, filter.isAudienceFamilies, filter.isAudienceRetiredRovers,
+                filter.isAudienceSingles, filter.isAudience2030Somethings, filter.isAudienceYouth)) {
+                /* The user has selected discrete filters for this category.  Check to see if the activity
+                 * falls into one of the categories selected. */
+                if (!((filter.isAudienceAdults && activity.isAudienceAdults) ||
+                    (filter.isAudienceFamilies && activity.isAudienceFamilies) ||
+                    (filter.isAudienceRetiredRovers && activity.isAudienceRetired) ||
+                    (filter.isAudienceSingles && activity.isAudienceSingles) ||
+                    (filter.isAudience2030Somethings && activity.isAudience2030Somethings) ||
+                    (filter.isAudienceYouth && activity.isAudienceYouth))) {
+                    updateCounterPromise.resolve();  // Failed - this saved search does not get updated by this activity
+                    break;
+                }
+            }
+
+            // Evaluate branch options
+            if (!areAllEqual(filter.isBranchTheMountaineers, filter.isBranchBellingham, filter.isBranchEverett,
+                filter.isBranchFoothills, filter.isBranchKitsap, filter.isBranchOlympia,
+                filter.isBranchOutdoorCenters, filter.isBranchSeattle, filter.isBranchTacoma)) {
+                /* The user has selected discrete filters for this category.  Check to see if the activity
+                 * falls into one of the categories selected. */
+                if (!((filter.isBranchTheMountaineers && activity.isBranchTheMountaineers) ||
+                    (filter.isBranchBellingham && activity.isBranchBellingham) ||
+                    (filter.isBranchEverett && activity.isBranchEverett) ||
+                    (filter.isBranchFoothills && activity.isBranchFoothills) ||
+                    (filter.isBranchKitsap && activity.isBranchKitsap) ||
+                    (filter.isBranchOlympia && activity.isBranchOlympia) ||
+                    (filter.isBranchOutdoorCenters && activity.isBranchOutdoorCenters) ||
+                    (filter.isBranchSeattle && activity.isBranchSeattle) ||
+                    (filter.isBranchTacoma && activity.isBranchTacoma))) {
+                    updateCounterPromise.resolve();  // Failed - this saved search does not get updated by this activity
+                    break;
+                }
+            }
+
+            // Evaluate climbing options
+            if (filter.isClimbingBasicAlpine || filter.isClimbingIntermediateAlpine ||
+                filter.isClimbingAidClimb || filter.isClimbingRockClimb) {
+                /* The user has selected discrete filters for this category.  Check to see if the activity
+                 * falls into one of the categories selected. */
+                if (!((filter.isClimbingBasicAlpine && activity.isClimbingBasicAlpine) ||
+                    (filter.isClimbingIntermediateAlpine && activity.isClimbingIntermediateAlpine) ||
+                    (filter.isClimbingAidClimb && activity.isClimbingAidClimb) ||
+                    (filter.isClimbingRockClimb && activity.isClimbingRockClimb))) {
+                    updateCounterPromise.resolve();  // Failed - this saved search does not get updated by this activity
+                    break;
+                }
+            }
+
+            // Evaluate skiing/snowboarding options
+            if (filter.isSkiingCrossCountry || filter.isSkiingBackcountry || filter.isSkiingGlacier) {
+                /* The user has selected discrete filters for this category.  Check to see if the activity
+                 * falls into one of the categories selected. */
+                if (!((filter.isSkiingCrossCountry && activity.isSkiingCrossCountry) ||
+                    (filter.isSkiingBackcountry && activity.isSkiingBackcountry) ||
+                    (filter.isSkiingGlacier && activity.isSkiingGlacier))) {
+                    updateCounterPromise.resolve();  // Failed - this saved search does not get updated by this activity
+                    break;
+                }
+            }
+
+            // Evaluate snowshoeing options
+            if (filter.isSnowshoeingBeginner || filter.isSnowshoeingBasic || filter.isSnowshoeingIntermediate) {
+                /* The user has selected discrete filters for this category.  Check to see if the activity
+                 * falls into one of the categories selected. */
+                if (!((filter.isSnowshoeingBeginner && activity.isSnowshoeingBeginner) ||
+                    (filter.isSnowshoeingBasic && activity.isSnowshoeingBasic) ||
+                    (filter.isSnowshoeingIntermediate && activity.isSnowshoeingIntermediate))) {
+                    updateCounterPromise.resolve();  // Failed - this saved search does not get updated by this activity
+                    break;
+                }
+            }
+
+            // MATCH!
+            // Increment the saved search's update counter since this activity has satisfied all the requirements
+            result.set(PARSE_CONST.KEY_UPDATE_COUNT, result.get(PARSE_CONST.KEY_UPDATE_COUNT) + 1);
+
+            // Save the updated saved search (i.e.updated counter)
+            result.save().then(function (result) {
+                updateCounterPromise.resolve();
+            }, function (result, error) {
+                updateCounterPromise.reject("Error updating saved search results!");
+            });
+        }
+        while(false);  // Never allow to run more than once
+
+        return updateCounterPromise;
+    }
+
+    function recursiveSavedSearchUpdateLoader(activity) {
+        var batchPromises = [];
+        var increment = 1;
+
+        // Load the saved search update
+        for (var i = numSavedSearchComplete; i < numSavedSearchComplete + increment && i < totalSavedSearches; i++) {
+            batchPromises.push(updateSavedSearchCounter(activity, i));
+        }
+
+        // Wait until all promises return resolved (or there is a rejection)
+        Parse.Promise.when(batchPromises).then(function () {
+            // Increment the counter
+            numSavedSearchComplete = numSavedSearchComplete + increment;
+
+            // Check whether another recursive run is required to get all of the updates
+            if (numSavedSearchComplete < totalSavedSearches) {
+                recursiveSavedSearchUpdateLoader(activity);
+            }
+            else {
+                savedSearchUpdatePromise.resolve();  // All updater promises were resolved
+            }
+        }, function (error) {  // Parse could not could not update the saved search counter
+            recursiveSavedSearchUpdateLoader(activity);  // Re-run failed update loader
+        });
+
+        return savedSearchUpdatePromise;
+    }
+
     /* This function accepts the JSON-formatted activity list (in the form of a JSON object), searches for updates or
      * additions and saves them in the backend */
     function scrapeActivity(jsObject) {
@@ -340,11 +642,14 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         var activityObj = new ActivityClass();
         var activity = new ActivityObject();
         var query;
-        var keywords = [];
         var leaderRoleTypes = [0,0,0,0,0,0];
         var leaderPosition = 0;
-        var exists = false;
         var i;
+        var isNew = false;
+        var isMajorUpdate = false;
+
+        // Reset the promise that is returned from the recursive saved search update counter loader
+        savedSearchUpdatePromise = new Parse.Promise();
 
         // Assign all values to activity object
         activity.id = jsObject.id;
@@ -388,7 +693,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             if (typeof object !== "undefined") {  // Duplicate found so use this existing object
                 // Use the existing activity object
                 activityObj = object;
-                exists = true;
             }
 
             return Parse.Promise.as();
@@ -398,6 +702,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             // Activity ID
             if (activity.id !== activityObj.get(PARSE_CONST.KEY_ACTIVITY_ID)) {
                 activityObj.set(PARSE_CONST.KEY_ACTIVITY_ID, activity.id);
+                isNew = true;
             }
 
             // Title Information
@@ -419,6 +724,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             // Activity Title
             if (activity.title !== activityObj.get(PARSE_CONST.KEY_ACTIVITY_TITLE)) {
                 activityObj.set(PARSE_CONST.KEY_ACTIVITY_TITLE, activity.title);
+                isMajorUpdate = true;
             }
 
             // Activity Title Header
@@ -502,80 +808,101 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             // Now assign the values for the activity type categories
             if (activity.isTypeAdventureClub !== activityObj.get(PARSE_CONST.KEY_TYPE_ADVENTURE_CLUB)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_ADVENTURE_CLUB, activity.isTypeAdventureClub);
+                isMajorUpdate = true;
             }
             if (activity.isTypeBackpacking !== activityObj.get(PARSE_CONST.KEY_TYPE_BACKPACKING)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_BACKPACKING, activity.isTypeBackpacking);
+                isMajorUpdate = true;
             }
             if (activity.isTypeClimbing !== activityObj.get(PARSE_CONST.KEY_TYPE_CLIMBING)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_CLIMBING, activity.isTypeClimbing);
+                isMajorUpdate = true;
             }
             if (activity.isTypeDayHiking !== activityObj.get(PARSE_CONST.KEY_TYPE_DAY_HIKING)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_DAY_HIKING, activity.isTypeDayHiking);
+                isMajorUpdate = true;
             }
             if (activity.isTypeExplorers !== activityObj.get(PARSE_CONST.KEY_TYPE_EXPLORERS)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_EXPLORERS, activity.isTypeExplorers);
+                isMajorUpdate = true;
             }
             if (activity.isTypeExploringNature !== activityObj.get(PARSE_CONST.KEY_TYPE_EXPLORING_NATURE)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_EXPLORING_NATURE, activity.isTypeExploringNature);
+                isMajorUpdate = true;
             }
             if (activity.isTypeGlobalAdventures !== activityObj.get(PARSE_CONST.KEY_TYPE_GLOBAL_ADVENTURES)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_GLOBAL_ADVENTURES, activity.isTypeGlobalAdventures);
+                isMajorUpdate = true;
             }
             if (activity.isTypeMountainWorkshop !== activityObj.get(PARSE_CONST.KEY_TYPE_MOUNTAIN_WORKSHOP)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_MOUNTAIN_WORKSHOP, activity.isTypeMountainWorkshop);
+                isMajorUpdate = true;
             }
             if (activity.isTypeNavigation !== activityObj.get(PARSE_CONST.KEY_TYPE_NAVIGATION)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_NAVIGATION, activity.isTypeNavigation);
+                isMajorUpdate = true;
             }
             if (activity.isTypePhotography !== activityObj.get(PARSE_CONST.KEY_TYPE_PHOTOGRAPHY)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_PHOTOGRAPHY, activity.isTypePhotography);
+                isMajorUpdate = true;
             }
             if (activity.isTypeSailing !== activityObj.get(PARSE_CONST.KEY_TYPE_SAILING)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_SAILING, activity.isTypeSailing);
+                isMajorUpdate = true;
             }
             if (activity.isTypeScrambling !== activityObj.get(PARSE_CONST.KEY_TYPE_SCRAMBLING)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_SCRAMBLING, activity.isTypeScrambling);
+                isMajorUpdate = true;
             }
             if (activity.isTypeSeaKayaking !== activityObj.get(PARSE_CONST.KEY_TYPE_SEA_KAYAKING)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_SEA_KAYAKING, activity.isTypeSeaKayaking);
+                isMajorUpdate = true;
             }
             if (activity.isTypeSkiingSnowboarding !== activityObj.get(PARSE_CONST.KEY_TYPE_SKIING_SNOWBOARDING)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_SKIING_SNOWBOARDING, activity.isTypeSkiingSnowboarding);
+                isMajorUpdate = true;
             }
             if (activity.isTypeSnowshoeing !== activityObj.get(PARSE_CONST.KEY_TYPE_SNOWSHOEING)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_SNOWSHOEING, activity.isTypeSnowshoeing);
+                isMajorUpdate = true;
             }
             if (activity.isTypeStewardship !== activityObj.get(PARSE_CONST.KEY_TYPE_STEWARDSHIP)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_STEWARDSHIP, activity.isTypeStewardship);
+                isMajorUpdate = true;
             }
             if (activity.isTypeTrailRunning !== activityObj.get(PARSE_CONST.KEY_TYPE_TRAIL_RUNNING)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_TRAIL_RUNNING, activity.isTypeTrailRunning);
+                isMajorUpdate = true;
             }
             if (activity.isTypeUrbanAdventure !== activityObj.get(PARSE_CONST.KEY_TYPE_URBAN_ADVENTURE)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_URBAN_ADVENTURE, activity.isTypeUrbanAdventure);
+                isMajorUpdate = true;
             }
             if (activity.isTypeYouth !== activityObj.get(PARSE_CONST.KEY_TYPE_YOUTH)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_YOUTH, activity.isTypeYouth);
+                isMajorUpdate = true;
             }
 
             // Activity Creation Date
-            if (activity.created !== activityObj.get(PARSE_CONST.KEY_ACTIVITY_CREATION_DATE)) {
-                activityObj.set(PARSE_CONST.KEY_ACTIVITY_CREATION_DATE, activity.created);
+            if (!new Date(activity.created).equals(activityObj.get(PARSE_CONST.KEY_ACTIVITY_CREATION_DATE))) {
+                activityObj.set(PARSE_CONST.KEY_ACTIVITY_CREATION_DATE, new Date(activity.created));
             }
 
             // Activity Modification Date
-            if (activity.modified !== activityObj.get(PARSE_CONST.KEY_ACTIVITY_MODIFICATION_DATE)) {
-                activityObj.set(PARSE_CONST.KEY_ACTIVITY_MODIFICATION_DATE, activity.modified);
+            if (!new Date(activity.modified).equals(activityObj.get(PARSE_CONST.KEY_ACTIVITY_MODIFICATION_DATE))) {
+                activityObj.set(PARSE_CONST.KEY_ACTIVITY_MODIFICATION_DATE, new Date(activity.modified));
             }
 
             // Activity Start Date
             if (!new Date(activity.start).equals(activityObj.get(PARSE_CONST.KEY_ACTIVITY_START_DATE))) {
                 activityObj.set(PARSE_CONST.KEY_ACTIVITY_START_DATE, new Date(activity.start));
+                isMajorUpdate = true;
             }
 
             // Activity End Date
             if (!new Date(activity.end).equals(activityObj.get(PARSE_CONST.KEY_ACTIVITY_END_DATE))) {
                 activityObj.set(PARSE_CONST.KEY_ACTIVITY_END_DATE, new Date(activity.end));
+                isMajorUpdate = true;
             }
 
             // Activity URL
@@ -612,21 +939,27 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             // Now assign the values for the audience categories
             if (activity.isAudienceAdults !== activityObj.get(PARSE_CONST.KEY_AUDIENCE_ADULTS)) {
                 activityObj.set(PARSE_CONST.KEY_AUDIENCE_ADULTS, activity.isAudienceAdults);
+                isMajorUpdate = true;
             }
             if (activity.isAudienceFamilies !== activityObj.get(PARSE_CONST.KEY_AUDIENCE_FAMILIES)) {
                 activityObj.set(PARSE_CONST.KEY_AUDIENCE_FAMILIES, activity.isAudienceFamilies);
+                isMajorUpdate = true;
             }
             if (activity.isAudienceRetiredRovers !== activityObj.get(PARSE_CONST.KEY_AUDIENCE_RETIRED_ROVERS)) {
                 activityObj.set(PARSE_CONST.KEY_AUDIENCE_RETIRED_ROVERS, activity.isAudienceRetiredRovers);
+                isMajorUpdate = true;
             }
             if (activity.isAudienceSingles !== activityObj.get(PARSE_CONST.KEY_AUDIENCE_SINGLES)) {
                 activityObj.set(PARSE_CONST.KEY_AUDIENCE_SINGLES, activity.isAudienceSingles);
+                isMajorUpdate = true;
             }
             if (activity.isAudience2030Somethings !== activityObj.get(PARSE_CONST.KEY_AUDIENCE_20_30_SOMETHINGS)) {
                 activityObj.set(PARSE_CONST.KEY_AUDIENCE_20_30_SOMETHINGS, activity.isAudience2030Somethings);
+                isMajorUpdate = true;
             }
             if (activity.isAudienceYouth !== activityObj.get(PARSE_CONST.KEY_AUDIENCE_YOUTH)) {
                 activityObj.set(PARSE_CONST.KEY_AUDIENCE_YOUTH, activity.isAudienceYouth);
+                isMajorUpdate = true;
             }
 
             // Availability - Leader
@@ -687,33 +1020,42 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                 console.log("New branch: " + activity.branch);
             }
 
-            // Now assign the values for the audience categories
+            // Now assign the values for the branch categories
             if (activity.isBranchTheMountaineers !== activityObj.get(PARSE_CONST.KEY_BRANCH_THE_MOUNTAINEERS)) {
                 activityObj.set(PARSE_CONST.KEY_BRANCH_THE_MOUNTAINEERS, activity.isBranchTheMountaineers);
+                isMajorUpdate = true;
             }
             if (activity.isBranchBellingham !== activityObj.get(PARSE_CONST.KEY_BRANCH_BELLINGHAM)) {
                 activityObj.set(PARSE_CONST.KEY_BRANCH_BELLINGHAM, activity.isBranchBellingham);
+                isMajorUpdate = true;
             }
             if (activity.isBranchEverett !== activityObj.get(PARSE_CONST.KEY_BRANCH_EVERETT)) {
                 activityObj.set(PARSE_CONST.KEY_BRANCH_EVERETT, activity.isBranchEverett);
+                isMajorUpdate = true;
             }
             if (activity.isBranchFoothills !== activityObj.get(PARSE_CONST.KEY_BRANCH_FOOTHILLS)) {
                 activityObj.set(PARSE_CONST.KEY_BRANCH_FOOTHILLS, activity.isBranchFoothills);
+                isMajorUpdate = true;
             }
             if (activity.isBranchKitsap !== activityObj.get(PARSE_CONST.KEY_BRANCH_KITSAP)) {
                 activityObj.set(PARSE_CONST.KEY_BRANCH_KITSAP, activity.isBranchKitsap);
+                isMajorUpdate = true;
             }
             if (activity.isBranchOlympia !== activityObj.get(PARSE_CONST.KEY_BRANCH_OLYMPIA)) {
                 activityObj.set(PARSE_CONST.KEY_BRANCH_OLYMPIA, activity.isBranchOlympia);
+                isMajorUpdate = true;
             }
             if (activity.isBranchOutdoorCenters !== activityObj.get(PARSE_CONST.KEY_BRANCH_OUTDOOR_CENTERS)) {
                 activityObj.set(PARSE_CONST.KEY_BRANCH_OUTDOOR_CENTERS, activity.isBranchOutdoorCenters);
+                isMajorUpdate = true;
             }
             if (activity.isBranchSeattle !== activityObj.get(PARSE_CONST.KEY_BRANCH_SEATTLE)) {
                 activityObj.set(PARSE_CONST.KEY_BRANCH_SEATTLE, activity.isBranchSeattle);
+                isMajorUpdate = true;
             }
             if (activity.isBranchTacoma !== activityObj.get(PARSE_CONST.KEY_BRANCH_TACOMA)) {
                 activityObj.set(PARSE_CONST.KEY_BRANCH_TACOMA, activity.isBranchTacoma);
+                isMajorUpdate = true;
             }
 
             // Climbing Category
@@ -737,15 +1079,19 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             // Now assign the values for the climbing categories
             if (activity.isClimbingBasicAlpine !== activityObj.get(PARSE_CONST.KEY_CLIMBING_BASIC_ALPINE)) {
                 activityObj.set(PARSE_CONST.KEY_CLIMBING_BASIC_ALPINE, activity.isClimbingBasicAlpine);
+                isMajorUpdate = true;
             }
             if (activity.isClimbingIntermediateAlpine !== activityObj.get(PARSE_CONST.KEY_CLIMBING_INTERMEDIATE_ALPINE)) {
                 activityObj.set(PARSE_CONST.KEY_CLIMBING_INTERMEDIATE_ALPINE, activity.isClimbingIntermediateAlpine);
+                isMajorUpdate = true;
             }
             if (activity.isClimbingAidClimb !== activityObj.get(PARSE_CONST.KEY_CLIMBING_AID_CLIMB)) {
                 activityObj.set(PARSE_CONST.KEY_CLIMBING_AID_CLIMB, activity.isClimbingAidClimb);
+                isMajorUpdate = true;
             }
             if (activity.isClimbingRockClimb !== activityObj.get(PARSE_CONST.KEY_CLIMBING_ROCK_CLIMB)) {
                 activityObj.set(PARSE_CONST.KEY_CLIMBING_ROCK_CLIMB, activity.isClimbingRockClimb);
+                isMajorUpdate = true;
             }
 
             // Skiing Category
@@ -766,12 +1112,15 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             // Now assign the values for the skiing categories
             if (activity.isSkiingCrossCountry !== activityObj.get(PARSE_CONST.KEY_SKIING_CROSS_COUNTRY)) {
                 activityObj.set(PARSE_CONST.KEY_SKIING_CROSS_COUNTRY, activity.isSkiingCrossCountry);
+                isMajorUpdate = true;
             }
             if (activity.isSkiingBackcountry !== activityObj.get(PARSE_CONST.KEY_SKIING_BACKCOUNTRY)) {
                 activityObj.set(PARSE_CONST.KEY_SKIING_BACKCOUNTRY, activity.isSkiingBackcountry);
+                isMajorUpdate = true;
             }
             if (activity.isSkiingGlacier !== activityObj.get(PARSE_CONST.KEY_SKIING_GLACIER)) {
                 activityObj.set(PARSE_CONST.KEY_SKIING_GLACIER, activity.isSkiingGlacier);
+                isMajorUpdate = true;
             }
 
             // Snowshoeing Category
@@ -792,12 +1141,15 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             // Now assign the values for the snowshoeing categories
             if (activity.isSnowshoeingBeginner !== activityObj.get(PARSE_CONST.KEY_SNOWSHOEING_BEGINNER)) {
                 activityObj.set(PARSE_CONST.KEY_SNOWSHOEING_BEGINNER, activity.isSnowshoeingBeginner);
+                isMajorUpdate = true;
             }
             if (activity.isSnowshoeingBasic !== activityObj.get(PARSE_CONST.KEY_SNOWSHOEING_BASIC)) {
                 activityObj.set(PARSE_CONST.KEY_SNOWSHOEING_BASIC, activity.isSnowshoeingBasic);
+                isMajorUpdate = true;
             }
             if (activity.isSnowshoeingIntermediate !== activityObj.get(PARSE_CONST.KEY_SNOWSHOEING_INTERMEDIATE)) {
                 activityObj.set(PARSE_CONST.KEY_SNOWSHOEING_INTERMEDIATE, activity.isSnowshoeingIntermediate);
+                isMajorUpdate = true;
             }
 
             // Difficulty
@@ -860,15 +1212,19 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             // Now assign the values for the leader rating categories
             if (activity.isRatingForBeginners !== activityObj.get(PARSE_CONST.KEY_RATING_FOR_BEGINNERS)) {
                 activityObj.set(PARSE_CONST.KEY_RATING_FOR_BEGINNERS, activity.isRatingForBeginners);
+                isMajorUpdate = true;
             }
             if (activity.isRatingEasy !== activityObj.get(PARSE_CONST.KEY_RATING_EASY)) {
                 activityObj.set(PARSE_CONST.KEY_RATING_EASY, activity.isRatingEasy);
+                isMajorUpdate = true;
             }
             if (activity.isRatingModerate !== activityObj.get(PARSE_CONST.KEY_RATING_MODERATE)) {
                 activityObj.set(PARSE_CONST.KEY_RATING_MODERATE, activity.isRatingModerate);
+                isMajorUpdate = true;
             }
             if (activity.isRatingChallenging !== activityObj.get(PARSE_CONST.KEY_RATING_CHALLENGING)) {
                 activityObj.set(PARSE_CONST.KEY_RATING_CHALLENGING, activity.isRatingChallenging);
+                isMajorUpdate = true;
             }
 
             // Prerequisites
@@ -957,6 +1313,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             // Now assign the values for the audience categories
             if (!activity.leaderName.equals(activityObj.get(PARSE_CONST.KEY_LEADER_NAME))) {
                 activityObj.set(PARSE_CONST.KEY_LEADER_NAME, activity.leaderName);
+                isMajorUpdate = true;
             }
             if (!activity.leaderRole.equals(activityObj.get(PARSE_CONST.KEY_LEADER_ROLE))) {
                 activityObj.set(PARSE_CONST.KEY_LEADER_ROLE, activity.leaderRole);
@@ -967,38 +1324,50 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
             // Keywords
             // Process unique keywords based on title, title header and leader names
-            keywords = getKeywords((activity.title + "," + activity.titleHeader + "," + activity.leaderName.join())
-                .toLowerCase());
+            activity.keywords = getKeywords((activity.title + "," + activity.titleHeader + ","
+                + activity.leaderName.join()).toLowerCase());
 
-            if (!areKeywordsEqual(keywords, activityObj.get(PARSE_CONST.KEY_KEYWORDS))) {
-                activityObj.set(PARSE_CONST.KEY_KEYWORDS, keywords);
+            if (!areKeywordsEqual(activity.keywords, activityObj.get(PARSE_CONST.KEY_KEYWORDS))) {
+                activityObj.set(PARSE_CONST.KEY_KEYWORDS, activity.keywords);
+                isMajorUpdate = true;
+            }
+
+            // Check for a new activity or a major update (one that affects search results - keywords and filter options)
+            // Add appropriate timestamp
+            if (isNew) {  // Is a new activity
+                activityObj.set(PARSE_CONST.KEY_ACTIVITY_ADDED_AT, new Date());
+            }
+            else if (isMajorUpdate) {  // Is a major update for an existing activity
+                activityObj.set(PARSE_CONST.KEY_ACTIVITY_UPDATED_AT, new Date());
             }
 
             // Check if any field has been added or changed
             if (activityObj.dirtyKeys().length !== 0) {  // Fields have changed
                 // Save activity object
-                activityObj.save(null, {
-                    success: function (activityObjSave) {
-                        // Update activity counters
-                        if (!exists) {
-                            newActivities++;
-                        }
-                        else {
-                            updatedActivities++;
-                        }
-
-                        scrapeActivityPromise.resolve();
-                    },
-                    // Error saving activity to Parse class
-                    error: function (activityObjSave, error) {
-                        // Show error message
-                        console.log("Failed to save activity id = " + activity.id + ".  Error code "
-                            + error.code + ": " + error.message);
-
-                        // No big deal - the filters will be updated on the next scraping (run every x minutes on Parse)
-                        scrapeActivityPromise.reject("Failed to save activity id = " + activity.id + ".  Error code "
-                            + error.code + ": " + error.message);
+                activityObj.save().then(function (activityObjSave) {
+                    // Update activity counters
+                    if (isNew) {
+                        newActivities++;
                     }
+                    else {
+                        updatedActivities++;
+                    }
+
+                    // Reset the number of saved searches reviewed
+                    numSavedSearchComplete = 0;
+
+                    // Launch the saved search update loader for this activity
+                    return recursiveSavedSearchUpdateLoader(activity);
+                }).then(function() {
+                    scrapeActivityPromise.resolve();
+                }, function (error) {
+                    // Show error message
+                    console.log("Failed to save activity id = " + activity.id + ".  Error code "
+                        + error.code + ": " + error.message);
+
+                    // No big deal - the filters will be updated on the next scraping (run every x minutes on Parse)
+                    scrapeActivityPromise.reject("Failed to save activity id = " + activity.id + ".  Error code "
+                        + error.code + ": " + error.message);
                 });
             }
             else {  // No need to update the object
@@ -1014,31 +1383,33 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         return scrapeActivityPromise;
     }
 
-    function recursive(jsObject) {
+    function recursiveScrapeActivityLoader() {
         var increment = 1;
 
         // Load the activity object
-        for (var i = numComplete; i < numComplete + increment && i < jsObject.length; i++) {
+        for (var i = numActivityComplete; i < numActivityComplete + increment && i < totalActivities; i++) {
             promises.push(scrapeActivity(jsObject[i]));
         }
 
         // Wait until all promises return resolved (or there is a rejection)
         Parse.Promise.when(promises).then(function () {
-            numComplete = numComplete + increment;  // Increment the counter
+            numActivityComplete = numActivityComplete + increment;  // Increment the counter
 
             // Check whether another recursive run is required to get all of the activities
-            if (numComplete < jsObject.length) {
-                recursive(jsObject);
+            if (numActivityComplete < totalActivities) {
+                recursiveScrapeActivityLoader();
             }
             else {
                 onCompletionListener.resolve();  // Tell the listener all promises were resolved
             }
         }, function (error) {  // Either Parse could not pull up the activity record or it could not save it
-            recursive(jsObject);  // Re-run failed scrape
+            recursiveScrapeActivityLoader();  // Re-run failed scrape
         });
     }
 
-    // The code below is what drives this Cloud Background Job.
+    /////////////////////////////////////////////////////////////
+    // The code below is what drives this Cloud Background Job //
+    /////////////////////////////////////////////////////////////
 
     // Request the activity data in JSON format
     Parse.Cloud.httpRequest({
@@ -1048,12 +1419,69 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         }
     }).then(function(httpResponse) {
         // Hello object literal!
-        var jsObject = JSON.parse(httpResponse.text);
+        jsObject = JSON.parse(httpResponse.text);
         totalActivities = jsObject.length;
 
-        // Recursive batch activity scrapings
-        recursive(jsObject);
+        // Get list of all saved searches
+        savedSearchQuery = new Parse.Query(PARSE_CONST.CLASS_SAVED_SEARCHES);
+        savedSearchQuery.find().then(function (results) {
+            savedSearches = results;  // Save list of saved searches for later usage
+            totalSavedSearches = savedSearches.length;
+
+            // Recursive activity scraping loader
+            recursiveScrapeActivityLoader();
+        }, function (error) {
+            onCompletionListener.reject("Error retrieving saved search results!");  // Send error through to listener
+        });
     }, function (error) {
         onCompletionListener.reject(error);  // Send error through to listener
+    });
+});
+
+// The following Cloud function resets the update counter on a saved search and updates the time stamp for last viewed
+Parse.Cloud.define("resetUpdateCounter", function(request, response) {
+    var query = new Parse.Query(PARSE_CONST.CLASS_SAVED_SEARCHES);
+    query.equalTo(PARSE_CONST.KEY_OBJECT_ID, request.params.objectId);
+
+    query.first({
+        success: function(result) {
+            result.set(PARSE_CONST.KEY_UPDATE_COUNT, 0);  // Reset counter to 0
+            result.set(PARSE_CONST.KEY_LAST_ACCESS, new Date());  // Update last accessed timestamp to now
+
+            // Save the changes
+            result.save(null, {
+                success: function() {
+                    response.success("Saved search reset success");
+                },
+                error: function() {
+                    response.error("Saved search reset failed");
+                }
+            });
+        },
+        error: function() {
+            response.error("Saved search reset failed");
+        }
+    });
+});
+
+// The following Cloud function deletes a given saved search
+Parse.Cloud.define("deleteSavedSearch", function(request, response) {
+    var query = new Parse.Query(PARSE_CONST.CLASS_SAVED_SEARCHES);
+    query.equalTo(PARSE_CONST.KEY_OBJECT_ID, request.params.objectId);
+
+    query.first({
+        success: function(result) {
+            result.destroy({
+                success: function(myObject) {
+                    response.success("Saved search deletion success");
+                },
+                error: function(myObject, error) {
+                    response.error("Saved search deletion failed");
+                }
+            });
+        },
+        error: function() {
+            response.error("Saved search deletion failed");
+        }
     });
 });
