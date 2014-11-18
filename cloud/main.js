@@ -6,6 +6,7 @@ var PARSE_CONST = {
 
     // Fields
     KEY_OBJECT_ID: "objectId",
+    KEY_SAVE_NAME: "searchName",
     KEY_LAST_ACCESS: "lastAccess",
     KEY_UPDATE_COUNT: "updateCount",
 
@@ -81,7 +82,6 @@ var PARSE_CONST = {
     KEY_TYPE_EXPLORERS: "isTypeExplorers",
     KEY_TYPE_EXPLORING_NATURE: "isTypeExploringNature",
     KEY_TYPE_GLOBAL_ADVENTURES: "isTypeGlobalAdventures",
-    KEY_TYPE_MOUNTAIN_WORKSHOP: "isTypeMountainWorkshop",
     KEY_TYPE_NAVIGATION: "isTypeNavigation",
     KEY_TYPE_PHOTOGRAPHY: "isTypePhotography",
     KEY_TYPE_SAILING: "isTypeSailing",
@@ -148,7 +148,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         KEY_TYPE_EXPLORERS: "Explorers",
         KEY_TYPE_EXPLORING_NATURE: "Exploring Nature",
         KEY_TYPE_GLOBAL_ADVENTURES: "Global Adventures",
-        KEY_TYPE_MOUNTAIN_WORKSHOP: "Mountain Workshop",
         KEY_TYPE_NAVIGATION: "Navigation",
         KEY_TYPE_PHOTOGRAPHY: "Photography",
         KEY_TYPE_SAILING: "Sailing",
@@ -205,7 +204,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         this.isTypeExplorers = false;
         this.isTypeExploringNature = false;
         this.isTypeGlobalAdventures = false;
-        this.isTypeMountainWorkshop = false;
         this.isTypeNavigation = false;
         this.isTypePhotography = false;
         this.isTypeSailing = false;
@@ -400,7 +398,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             filter.isTypeExplorers = result.get(PARSE_CONST.KEY_TYPE_EXPLORERS);
             filter.isTypeExploringNature = result.get(PARSE_CONST.KEY_TYPE_EXPLORING_NATURE);
             filter.isTypeGlobalAdventures = result.get(PARSE_CONST.KEY_TYPE_GLOBAL_ADVENTURES);
-            filter.isTypeMountainWorkshop = result.get(PARSE_CONST.KEY_TYPE_MOUNTAIN_WORKSHOP);
             filter.isTypeNavigation = result.get(PARSE_CONST.KEY_TYPE_NAVIGATION);
             filter.isTypePhotography = result.get(PARSE_CONST.KEY_TYPE_PHOTOGRAPHY);
             filter.isTypeSailing = result.get(PARSE_CONST.KEY_TYPE_SAILING);
@@ -471,11 +468,10 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             // Check if they're not all true or not all false
             if (!areAllEqual(filter.isTypeAdventureClub, filter.isTypeBackpacking, filter.isTypeClimbing,
                 filter.isTypeDayHiking, filter.isTypeExplorers, filter.isTypeExploringNature,
-                filter.isTypeGlobalAdventures, filter.isTypeMountainWorkshop, filter.isTypeNavigation,
-                filter.isTypePhotography, filter.isTypeSailing, filter.isTypeScrambling,
-                filter.isTypeSeaKayaking, filter.isTypeSkiingSnowboarding, filter.isTypeSnowshoeing,
-                filter.isTypeStewardship, filter.isTypeTrailRunning, filter.isTypeUrbanAdventure,
-                filter.isTypeYouth)) {
+                filter.isTypeGlobalAdventures, filter.isTypeNavigation, filter.isTypePhotography, filter.isTypeSailing,
+                filter.isTypeScrambling, filter.isTypeSeaKayaking, filter.isTypeSkiingSnowboarding,
+                filter.isTypeSnowshoeing, filter.isTypeStewardship, filter.isTypeTrailRunning,
+                filter.isTypeUrbanAdventure, filter.isTypeYouth)) {
                 /* The user has selected discrete filters for this category.  Check to see if the activity
                  * falls into one of the categories selected. */
                 if (!((filter.isTypeAdventureClub && activity.isTypeAdventureClub) ||
@@ -485,7 +481,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                     (filter.isTypeExplorers && activity.isTypeExplorers) ||
                     (filter.isTypeExploringNature && activity.isTypeExploringNature) ||
                     (filter.isTypeGlobalAdventures && activity.isTypeGlobalAdventures) ||
-                    (filter.isTypeMountainWorkshop && activity.isTypeMountainWorkshop) ||
                     (filter.isTypeNavigation && activity.isTypeNavigation) ||
                     (filter.isTypePhotography && activity.isTypePhotography) ||
                     (filter.isTypeSailing && activity.isTypeSailing) ||
@@ -524,7 +519,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                  * falls into one of the categories selected. */
                 if (!((filter.isAudienceAdults && activity.isAudienceAdults) ||
                     (filter.isAudienceFamilies && activity.isAudienceFamilies) ||
-                    (filter.isAudienceRetiredRovers && activity.isAudienceRetired) ||
+                    (filter.isAudienceRetiredRovers && activity.isAudienceRetiredRovers) ||
                     (filter.isAudienceSingles && activity.isAudienceSingles) ||
                     (filter.isAudience2030Somethings && activity.isAudience2030Somethings) ||
                     (filter.isAudienceYouth && activity.isAudienceYouth))) {
@@ -757,9 +752,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                     else if (activity.type[i] === JSON_CONST.KEY_TYPE_GLOBAL_ADVENTURES) {
                         activity.isTypeGlobalAdventures = true;
                     }
-                    else if (activity.type[i] === JSON_CONST.KEY_TYPE_MOUNTAIN_WORKSHOP) {
-                        activity.isTypeMountainWorkshop = true;
-                    }
                     else if (activity.type[i] === JSON_CONST.KEY_TYPE_NAVIGATION) {
                         activity.isTypeNavigation = true;
                     }
@@ -832,10 +824,6 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             }
             if (activity.isTypeGlobalAdventures !== activityObj.get(PARSE_CONST.KEY_TYPE_GLOBAL_ADVENTURES)) {
                 activityObj.set(PARSE_CONST.KEY_TYPE_GLOBAL_ADVENTURES, activity.isTypeGlobalAdventures);
-                isMajorUpdate = true;
-            }
-            if (activity.isTypeMountainWorkshop !== activityObj.get(PARSE_CONST.KEY_TYPE_MOUNTAIN_WORKSHOP)) {
-                activityObj.set(PARSE_CONST.KEY_TYPE_MOUNTAIN_WORKSHOP, activity.isTypeMountainWorkshop);
                 isMajorUpdate = true;
             }
             if (activity.isTypeNavigation !== activityObj.get(PARSE_CONST.KEY_TYPE_NAVIGATION)) {
@@ -1353,11 +1341,13 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                         updatedActivities++;
                     }
 
-                    // Reset the number of saved searches reviewed
-                    numSavedSearchComplete = 0;
+                    if (isNew || isMajorUpdate) {
+                        // Reset the number of saved searches reviewed
+                        numSavedSearchComplete = 0;
 
-                    // Launch the saved search update loader for this activity
-                    return recursiveSavedSearchUpdateLoader(activity);
+                        // Launch the saved search update loader for this activity
+                        return recursiveSavedSearchUpdateLoader(activity);
+                    }
                 }).then(function() {
                     scrapeActivityPromise.resolve();
                 }, function (error) {
@@ -1482,6 +1472,49 @@ Parse.Cloud.define("deleteSavedSearch", function(request, response) {
         },
         error: function() {
             response.error("Saved search deletion failed");
+        }
+    });
+});
+
+// The following Cloud function renames a given saved search
+Parse.Cloud.define("renameSavedSearch", function(request, response) {
+    var query = new Parse.Query(PARSE_CONST.CLASS_SAVED_SEARCHES);
+    query.equalTo(PARSE_CONST.KEY_OBJECT_ID, request.params.objectId);
+
+    query.first({
+        success: function(result) {
+            result.set(PARSE_CONST.KEY_SAVE_NAME, request.params.searchName);  // Update saved search name
+
+            result.save(null, {
+                success: function(myObject) {
+                    response.success("Saved search rename success");
+                },
+                error: function(myObject, error) {
+                    response.error("Saved search rename failed");
+                }
+            });
+        },
+        error: function() {
+            response.error("Saved search rename failed");
+        }
+    });
+});
+
+Parse.Cloud.job("PushTest", function (request, status) {
+    var query = new Parse.Query(Parse.Installation);
+    query.equalTo('userObjectId', "5hI498hYmj");
+
+    Parse.Push.send({
+        where: query, // Set our Installation query
+        data: {
+            alert: "Test Notification"
+        }
+    }, {
+        success: function() {
+            status.success("Push notification test sent!");
+        },
+        error: function(error) {
+            status.error("Push notification test failed!");
         }
     });
 });
