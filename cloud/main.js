@@ -6,6 +6,10 @@ var PARSE_CONST = {
 
     // Fields
     KEY_OBJECT_ID: "objectId",
+    KEY_USERNAME: "username",
+    KEY_PASSWORD: "password",
+    KEY_PWD: "pwd",
+    KEY_MEMBER_URL: "memberUrl",
     KEY_SAVE_NAME: "searchName",
     KEY_LAST_ACCESS: "lastAccess",
     KEY_UPDATE_COUNT: "updateCount",
@@ -325,6 +329,12 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         var keywordsSpaces = field.split(/\s+/);  // Split word by spaces
         var keywords = keywordsWordBorders.concat(keywordsSpaces);  // Combine both keyword arrays
 
+        if (field.toLowerCase().indexOf("devil") > -1) {
+            console.log("keywordsWordBorders: " + keywordsWordBorders.toString());
+            console.log("keywordsSpaces: " + keywordsSpaces.toString());
+            console.log("keywords: " + keywords.toString());
+        }
+
         // Filter out only lowercase words that do not match the ignoreWords
         keywords = _.map(keywords, toLowerCase);
         keywords = _.filter(keywords, function (w) {
@@ -633,6 +643,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     /* This function accepts the JSON-formatted activity list (in the form of a JSON object), searches for updates or
      * additions and saves them in the backend */
     function scrapeActivity(jsObject) {
+        var moment = require('cloud/moment-timezone-with-data');
         var scrapeActivityPromise = new Parse.Promise();
         var activityObj = new ActivityClass();
         var activity = new ActivityObject();
@@ -1341,12 +1352,18 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
                         updatedActivities++;
                     }
 
-                    if (isNew || isMajorUpdate) {
-                        // Reset the number of saved searches reviewed
-                        numSavedSearchComplete = 0;
+                    if ((isNew || isMajorUpdate)) {
+                        /* Determine if the activity has occurred in the past; if so, ignore updating saved search.
+                         * Activity start date is provided at the beginning of the day and 24 hours must be added to it.
+                         * Moment's offset function provides the UTC to Seattle time in minutes. */
+                         if ((activityObj.get(PARSE_CONST.KEY_ACTIVITY_START_DATE).getTime() + (24 * 60 * 60 * 1000)) >
+                             (new Date().getTime() - (moment.tz.zone('America/Vancouver').offset(new Date()) * 60 * 1000))) {
+                            // Reset the number of saved searches reviewed
+                            numSavedSearchComplete = 0;
 
-                        // Launch the saved search update loader for this activity
-                        return recursiveSavedSearchUpdateLoader(activity);
+                            // Launch the saved search update loader for this activity
+                            return recursiveSavedSearchUpdateLoader(activity);
+                        }
                     }
                 }).then(function() {
                     scrapeActivityPromise.resolve();
@@ -1401,6 +1418,8 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     // The code below is what drives this Cloud Background Job //
     /////////////////////////////////////////////////////////////
 
+    Parse.Cloud.useMasterKey();  // Allow master key permissions for activity scraping tasks
+
     // Request the activity data in JSON format
     Parse.Cloud.httpRequest({
         url: "https://www.mountaineers.org/upcoming-trips.json",
@@ -1425,6 +1444,40 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         });
     }, function (error) {
         onCompletionListener.reject(error);  // Send error through to listener
+    });
+});
+
+
+////////////////////////////////////////
+// The code below are Cloud Functions //
+////////////////////////////////////////
+
+// The following Cloud function resets the update counter on a saved search and updates the time stamp for last viewed
+Parse.Cloud.define("verifyUser", function(request, response) {
+    Parse.Cloud.useMasterKey();  // Allow master key permissions for verifying user task
+
+    var query = new Parse.Query(Parse.User);
+    query.equalTo(PARSE_CONST.KEY_USERNAME, request.params.username);
+
+    query.first({
+        success: function(result) {
+            if (!result) {  // Check for falsy value (i.e. undefined - user does not exist)
+                response.success("new");
+            }
+            else {  // User exists (first security measure passed)
+                // Second security measure - check member URL
+                if (result.get(PARSE_CONST.KEY_MEMBER_URL) == request.params.memberUrl) { // Matches
+                    // Check if member URL matches (second security measure)
+                    response.success(result.id);  // Send back the user's ObjectId
+                }
+                else {  // Does not match
+                    response.error("User verification failed");
+                }
+            }
+        },
+        error: function() {
+            response.error("User verification failed");
+        }
     });
 });
 
@@ -1456,6 +1509,8 @@ Parse.Cloud.define("resetUpdateCounter", function(request, response) {
 
 // The following Cloud function deletes a given saved search
 Parse.Cloud.define("deleteSavedSearch", function(request, response) {
+    Parse.Cloud.useMasterKey();  // Allow master key permissions for deleting saved searches
+
     var query = new Parse.Query(PARSE_CONST.CLASS_SAVED_SEARCHES);
     query.equalTo(PARSE_CONST.KEY_OBJECT_ID, request.params.objectId);
 
