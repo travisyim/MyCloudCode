@@ -13,8 +13,11 @@ var PARSE_CONST = {
     KEY_SAVE_NAME: "searchName",
     KEY_LAST_ACCESS: "lastAccess",
     KEY_UPDATE_COUNT: "updateCount",
+    KEY_USER_ID: "userId",
+    KEY_USER_OBJECT_ID: "userObjectId",
 
-    // Trip Information
+
+// Trip Information
     KEY_ACTIVITY_ID: "activityId",
     KEY_ACTIVITY_TITLE: "title",
     KEY_ACTIVITY_TITLE_HEADER: "titleHeader",
@@ -263,6 +266,9 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     var savedSearches;
     var numActivityComplete = 0;
     var numSavedSearchComplete;
+    var usersWithUpdates = [];  // Array that stores all users with updates to their saved searches
+    var numPushNotificationSent = 0;
+
 
     // Define listener to handle completion event
     var onCompletionListener = new Parse.Promise();  // Create a trivial resolved promise as a base case
@@ -318,27 +324,37 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
     // This function assigns the activity keywords based on the provided field
     function getKeywords(field) {
         var _ = require("underscore");  // Require underscore.js
-        var copy = field;
+
+        // Replace all "'s" with "s" (i.e. drop the apostrophe)
+        field = field.replace("'s", "s");
+        field = field.replace("’s", "s");
+        field = field.replace("ê", "e");
 
         var toLowerCase = function (w) {
             return w.toLowerCase();
         };
 
-        var ignoreWords = ["the", "in", "and", "to", "of", "at", "for", "from", "a", "an", "s"];  // Words to ignore
+        var ignoreWords = ["m", "t", "s", "re", "d", "ve", "ll", "the", "in", "and", "to", "of", "at", "for", "from",
+            "a", "an"];  // Words to ignore
         var keywordsWordBorders = field.split(/\b/);  // Split word by borders
         var keywordsSpaces = field.split(/\s+/);  // Split word by spaces
         var keywords = keywordsWordBorders.concat(keywordsSpaces);  // Combine both keyword arrays
 
-        if (field.toLowerCase().indexOf("devil") > -1) {
-            console.log("keywordsWordBorders: " + keywordsWordBorders.toString());
-            console.log("keywordsSpaces: " + keywordsSpaces.toString());
-            console.log("keywords: " + keywords.toString());
-        }
-
         // Filter out only lowercase words that do not match the ignoreWords
         keywords = _.map(keywords, toLowerCase);
         keywords = _.filter(keywords, function (w) {
-            return w.match(/^\w+$/) && !_.contains(ignoreWords, w);
+//            return w.match(/^\w+$/) && !_.contains(ignoreWords, w);
+            if (!w.trim()) {
+                return false;
+            }
+            else if (w.length == 1 && w.match(/^.*[^a-zA-Z0-9 ].*$/)) {
+                return false;
+            }
+            else if (_.contains(ignoreWords, w)) {
+                return false;
+            }
+
+            return true;
         });
 
         keywords = _.uniq(keywords);  // Do not allow duplicate keywords
@@ -394,6 +410,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             else {
                 filter.start = result.get(PARSE_CONST.KEY_ACTIVITY_START_DATE).getTime();
             }
+
             if (!result.get(PARSE_CONST.KEY_ACTIVITY_END_DATE)) {
                 filter.end = Number.MAX_VALUE;
             }
@@ -602,6 +619,9 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
 
             // Save the updated saved search (i.e.updated counter)
             result.save().then(function (result) {
+                // Add user associated with this saved search to the updates array
+                usersWithUpdates.push(result.get(PARSE_CONST.KEY_USER_ID));
+
                 updateCounterPromise.resolve();
             }, function (result, error) {
                 updateCounterPromise.reject("Error updating saved search results!");
@@ -630,7 +650,7 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             if (numSavedSearchComplete < totalSavedSearches) {
                 recursiveSavedSearchUpdateLoader(activity);
             }
-            else {
+            else {  // All saved searches counters have been updated
                 savedSearchUpdatePromise.resolve();  // All updater promises were resolved
             }
         }, function (error) {  // Parse could not could not update the saved search counter
@@ -1322,9 +1342,11 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             }
 
             // Keywords
-            // Process unique keywords based on title, title header and leader names
-            activity.keywords = getKeywords((activity.title + "," + activity.titleHeader + ","
-                + activity.leaderName.join()).toLowerCase());
+            // Process unique keywords based on title, title header, leader names, type and difficulty
+            activity.keywords = getKeywords(activity.title + " " + activity.titleHeader + " "
+                + (activity.leaderName !== null ? activity.leaderName.join(" ") : null) + " "
+                + (activity.type !== null ? activity.type.join(" ") : null) + " "
+                + (activity.difficulty !== null ? activity.difficulty.join(" ") : null));
 
             if (!areKeywordsEqual(activity.keywords, activityObj.get(PARSE_CONST.KEY_KEYWORDS))) {
                 activityObj.set(PARSE_CONST.KEY_KEYWORDS, activity.keywords);
@@ -1390,6 +1412,63 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
         return scrapeActivityPromise;
     }
 
+    function pushNotificationSender(user) {
+        var sendPromise = new Parse.Promise();
+        var count = 0;
+
+        // Get the installation object Ids associated with the given user
+        var updateQuery = new Parse.Query(Parse.Installation);
+        updateQuery.equalTo(PARSE_CONST.KEY_USER_OBJECT_ID, user);
+
+        // Go through all saved searches and count how many have new updates and belong to the given user
+        for (var i = 0; i < totalSavedSearches; i++) {
+            if (user == savedSearches[i].get(PARSE_CONST.KEY_USER_ID) && savedSearches[i].get(PARSE_CONST.KEY_UPDATE_COUNT) > 0) {
+                count++;
+            }
+        }
+
+        // Send push notification
+        Parse.Push.send({
+            where: updateQuery, // Set our Installation query
+            data: {count: count}
+        }).then(function() {
+            sendPromise.resolve("Push sent!");
+        }, function(error) {
+            sendPromise.reject("Error sending push notification!");
+        });
+
+        return sendPromise;
+    }
+
+    function recursivePushNotificationLoader(users) {
+        var pushNotificationPromise = new Parse.Promise();
+        var batchPromises = [];
+        var increment = 1;
+
+        // Load the push notification
+        for (var i = numPushNotificationSent; i < numPushNotificationSent + increment; i++) {
+            batchPromises.push(pushNotificationSender(users[i]));
+        }
+
+        // Wait until all promises return resolved (or there is a rejection)
+        Parse.Promise.when(batchPromises).then(function () {
+            // Increment the counter
+            numPushNotificationSent = numPushNotificationSent + increment;
+
+            // Check whether another recursive run is required to send all push notifications
+            if (numPushNotificationSent < users.length) {
+                recursivePushNotificationLoader(users);
+            }
+            else {  // All push notifications have been sent
+                pushNotificationPromise.resolve();  // All push notification promises were resolved
+            }
+        }, function (error) {  // Parse could not could not send the push notification
+            recursivePushNotificationLoader(users);  // Re-run failed push notification loader
+        });
+
+        return pushNotificationPromise;
+    }
+
     function recursiveScrapeActivityLoader() {
         var increment = 1;
 
@@ -1406,8 +1485,21 @@ Parse.Cloud.job("UpdateActivities", function (request, status) {
             if (numActivityComplete < totalActivities) {
                 recursiveScrapeActivityLoader();
             }
-            else {
-                onCompletionListener.resolve();  // Tell the listener all promises were resolved
+            else {  // Finished scraping all activities
+                // See if there were any saved search updates (i.e. any associated users in the array)
+                if (usersWithUpdates.length > 0) {  // Yes
+                    // Determine the unique list of users with updates
+                    var _ = require("underscore");  // Require underscore.js
+                    usersWithUpdates = _.uniq(usersWithUpdates);  // Do not allow duplicate users
+
+                    // Launch the recursive push notification loader
+                    recursivePushNotificationLoader(usersWithUpdates).then(function () {
+                        onCompletionListener.resolve();  // Tell the listener all promises were resolved
+                    });
+                }
+                else {  // No
+                    onCompletionListener.resolve();  // Tell the listener all promises were resolved
+                }
             }
         }, function (error) {  // Either Parse could not pull up the activity record or it could not save it
             recursiveScrapeActivityLoader();  // Re-run failed scrape
@@ -1555,21 +1647,63 @@ Parse.Cloud.define("renameSavedSearch", function(request, response) {
     });
 });
 
-Parse.Cloud.job("PushTest", function (request, status) {
-    var query = new Parse.Query(Parse.Installation);
-    query.equalTo('userObjectId', "5hI498hYmj");
+// The following Cloud job resets the update counter on all saved search and updates the time stamp for last viewed
+Parse.Cloud.job("resetAllUpdateCounters", function(request, status) {
+    var query = new Parse.Query(PARSE_CONST.CLASS_SAVED_SEARCHES);
 
-    Parse.Push.send({
-        where: query, // Set our Installation query
-        data: {
-            alert: "Test Notification"
-        }
-    }, {
-        success: function() {
-            status.success("Push notification test sent!");
+    query.find({
+        success: function(results) {
+            for (var i = 0; i < results.length; i++) {
+                results[i].set(PARSE_CONST.KEY_UPDATE_COUNT, 0);  // Reset counter to 0
+                results[i].set(PARSE_CONST.KEY_LAST_ACCESS, new Date());  // Update last accessed timestamp to now
+            }
+
+            // Save the changes
+            Parse.Object.saveAll(results, {
+                success: function(list) {
+                    status.success("Reset all saved searches!");
+                },
+                error: function() {
+                    status.error("Failed to reset all saved searches!");
+                }
+            });
         },
-        error: function(error) {
-            status.error("Push notification test failed!");
+        error: function() {
+            status.error("Failed to query all saved searches!");
         }
+    });
+});
+
+Parse.Cloud.job("PushTest", function (request, status) {
+    // Get the current Config alert message
+    Parse.Config.get().then(function(config) {
+        // Get Config variables
+        var alert = config.get("alert");
+        var userId = config.get("userId");
+
+        // Setup Installation query - default is sending it to all installation objects
+        var query = new Parse.Query(Parse.Installation);
+
+        // Check if userId has a 'falsy' value (i.e. null or empty)
+        if (userId) {  // Not a 'falsy' value
+            // Restrict the query to the specified user
+            query.equalTo(PARSE_CONST.KEY_USER_OBJECT_ID, userId);
+        }
+
+        Parse.Push.send({
+            where: query, // Set our Installation query
+            data: {
+                alert: alert
+            }
+        }, {
+            success: function() {
+                status.success("Push notification test sent! ");
+            },
+            error: function(error) {
+                status.error("Push notification test failed!");
+            }
+        });
+    }, function(error) {
+        status.error("Failed to get alert from Config!");
     });
 });
